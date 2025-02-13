@@ -1,16 +1,11 @@
 module TextSpace
 
-    export new_add
+using Unicode
 
-    """
-    This function adds two numbers.
+include("./Preprocessing.jl")
 
-    # Example(s)
-        julia> new_add(2,3)
-        5
-    """
-    function new_add(a, b)
-        return a + b
-    end
+export clean_text, tokenize, build_vocabulary
 
-end
+
+
+end #END MODULE

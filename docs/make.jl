@@ -5,7 +5,7 @@ DocMeta.setdocmeta!(TextSpace, :DocTestSetup, :(using TextSpace); recursive=true
 
 makedocs(;
     modules=[TextSpace],
-    authors="Alexander V. Mantzaris",
+    authors="Alexander V. Mantzaris, Samira Jahangiri",
     sitename="TextSpace.jl",
     format=Documenter.HTML(;
         canonical="https://mantzaris.github.io/TextSpace.jl",
