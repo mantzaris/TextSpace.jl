@@ -1,6 +1,4 @@
-```@meta
-CurrentModule = TextSpace
-```
+# TextSpace.jl
 
 ```@contents
 
@@ -13,6 +11,8 @@ Documentation for [TextSpace](https://github.com/mantzaris/TextSpace.jl).
 
 ```@index
 ```
+
+## Functions
 
 ```@autodocs
 Modules = [TextSpace]

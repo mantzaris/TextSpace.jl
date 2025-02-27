@@ -17,3 +17,11 @@ julia --project=docs -e 'using Pkg; Pkg.instantiate()'
 julia --project=docs -e 'using Pkg; Pkg.resolve()'
 
 julia --project=docs/ docs/make.jl
+
+
+cd ~/Documents/repos/TextSpace.jl
+julia --project=docs
+using Pkg
+Pkg.develop(path=".")
+Pkg.instantiate()
+julia --project=docs docs/make.jl

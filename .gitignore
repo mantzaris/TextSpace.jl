@@ -1,0 +1,10 @@
+# Ignore files in the docs folder (customize as needed)
+docs/build/
+docs/output/
+docs/deploy/
+docs/generated/
+docs/temp/
+
+
+# Ignore environment variables
+.env
