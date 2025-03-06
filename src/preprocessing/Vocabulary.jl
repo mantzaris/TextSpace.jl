@@ -1,15 +1,4 @@
-#Storing and managing word/subword indices, frequency tables, etc.
 
-# 9. **Vocabulary & Special Token Insertion**
-#    - For subword methods (BPE, WordPiece, SentencePiece), provide easy ways to add `[PAD]`, `[CLS]`, `[SEP]`, `[UNK]`, `[MASK]` at fixed IDs.
-#    - Offer a standardized serialization method (JSON, binary) for saving/loading vocabularies.
-
-#TODO: build_vocabulary_transformer , Generate a subword vocabulary using Byte-Pair Encoding (BPE), WordPiece, or SentencePiece. Create token-to-index mappings, including: Special tokens ([PAD], [CLS], [SEP], [UNK], [MASK]). Subword units (e.g., "run", "##ning" in WordPiece). Ensure deterministic tokenization so the LLM learns to process text in a consistent way. Example Workflow for BPE: Collect raw text corpus. Tokenize at character/subword level. Apply Byte-Pair Encoding (BPE) or WordPiece merging rules. Build token-to-index dictionary.
-#build_vocabulary_bpe(tokens::Vector{String}; vocab_size::Int=30000)
-#build_vocabulary_wordpiece(tokens::Vector{String}; vocab_size::Int=30000)
-
-# TODO: Implement build_vocabulary_bpe(tokens::Vector{String}; vocab_size::Int=30000)
-# TODO: Implement build_vocabulary_wordpiece(tokens::Vector{String}; vocab_size::Int=30000)
 
 using JSON
 
