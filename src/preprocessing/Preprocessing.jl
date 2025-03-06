@@ -3,13 +3,6 @@
 #=
 # Functions Needed for Full Text-Based Embedding Support
 
-## 1. **Character-Level Processing**
- `clean_text()` - Already implemented.  
- `tokenize(text, mode=:char)` - Already implemented.
- for multilingual corpora, you might need more robust normalization (e.g. NFKC, accent stripping, etc.).
-    coverage for languages without whitespace (Chinese, Japanese, etc.), you may consider specialized tokenizers or mention possible plugins.
-
-
 ## 2. **Subword Tokenization (For BPE/SentencePiece)**
  `subword_tokenize(text::String; model::Any)` - Uses BPE, WordPiece, or SentencePiece.
   [PAD], [CLS], [SEP], [UNK], [MASK]. This is crucial for transformer-based embeddings. Ensure your build_vocabulary_bpe(...) or build_vocabulary_wordpiece(...) functions can optionally inject these special tokens at fixed indices for consistent usage.
@@ -36,8 +29,6 @@
 
  # TODO: Add stopword removal & optional stemming/lemmatization in clean_text()
 # TODO: Implement tokenize_subword(text::String; tokenizer::Any) for BPE, WordPiece
-# TODO: Implement build_vocabulary_bpe(tokens::Vector{String}; vocab_size::Int=30000)
-# TODO: Implement build_vocabulary_wordpiece(tokens::Vector{String}; vocab_size::Int=30000)
 # TODO: Implement split_sentences(text::String) for sentence segmentation
 # TODO: Implement split_paragraphs(text::String) for paragraph segmentation
 # TODO: Implement process_document(text::String) to handle full document preprocessing
@@ -49,9 +40,6 @@
 #TODO: tokenize_subword(text::String; tokenizer::Any)
 #TODO: tokenize_char(text::String)
 #TODO: tokenize_sentence(text::String)
-#TODO: build_vocabulary_transformer , Generate a subword vocabulary using Byte-Pair Encoding (BPE), WordPiece, or SentencePiece. Create token-to-index mappings, including: Special tokens ([PAD], [CLS], [SEP], [UNK], [MASK]). Subword units (e.g., "run", "##ning" in WordPiece). Ensure deterministic tokenization so the LLM learns to process text in a consistent way. Example Workflow for BPE: Collect raw text corpus. Tokenize at character/subword level. Apply Byte-Pair Encoding (BPE) or WordPiece merging rules. Build token-to-index dictionary.
-#build_vocabulary_bpe(tokens::Vector{String}; vocab_size::Int=30000)
-#build_vocabulary_wordpiece(tokens::Vector{String}; vocab_size::Int=30000)
 #tokenize_subword(text::String, vocab::Dict{String, Int})
 
 ## Additional Recommendations for a Comprehensive Embeddings Pipeline
@@ -86,10 +74,6 @@
 8. **Batch Processing & Large Corpus Handling**
    - Consider batch-based or streaming methods for handling large datasets more efficiently.
    - Multi-threading or distributed processing (e.g., using `Threads.@threads` or `Distributed`) can significantly speed up large corpus embeddings.
-
-9. **Vocabulary & Special Token Insertion**
-   - For subword methods (BPE, WordPiece, SentencePiece), provide easy ways to add `[PAD]`, `[CLS]`, `[SEP]`, `[UNK]`, `[MASK]` at fixed IDs.
-   - Offer a standardized serialization method (JSON, binary) for saving/loading vocabularies.
 
 10. **Analysis & Diagnostics (Optional)**
    - Include helper utilities to analyze vocabulary coverage, out-of-vocabulary rates, or subword merges (e.g., `analyze_vocab_usage(tokens, vocab)`).
@@ -138,55 +122,4 @@ function tokenize_word(text::String; mode::Symbol = :word)
     end 
 end
 
-
-
-function build_vocabulary(tokens::Vector{String};
-    min_freq::Int = 0,
-    max_vocab_size::Int = typemax(Int),
-    special_tokens::Vector{String} = String[])
-
-    #count the frequency of each token
-    freq = Dict{String, Int}()
-    for token in tokens
-        freq[token] = get(freq, token, 0) + 1
-    end
-
-    #filter tokens based on the minimum frequency
-    filtered_tokens = Dict{String, Int}()
-    for (token, count) in freq
-        if count >= min_freq
-            filtered_tokens[token] = count
-        end
-    end
-
-    #sort tokens by frequency in descending order
-    sorted_tokens = sort(collect(keys(filtered_tokens)), by = x -> filtered_tokens[x], rev = true)
-
-    #limit the vocabulary size (if necessary)
-    if length(sorted_tokens) > max_vocab_size
-        sorted_tokens = sorted_tokens[1:max_vocab_size]
-    end
-
-    #create token-to-index mapping, reserving indices for special tokens first (if any)
-    token_to_index = Dict{String, Int}()
-    index_to_token = String[]
-
-    #add special tokens (if provided)
-    for token in special_tokens
-        push!(index_to_token, token)
-        token_to_index[token] = length(index_to_token)
-    end
-
-    # Add remaining tokens, ensuring no duplicates with special tokens
-    for token in sorted_tokens
-        if !haskey(token_to_index, token)
-            push!(index_to_token, token)
-            token_to_index[token] = length(index_to_token)
-        end
-    end
-
-    return Dict("token_to_index" => token_to_index,
-                    "index_to_token" => index_to_token,
-                    "freq"           => freq)
-end
 
