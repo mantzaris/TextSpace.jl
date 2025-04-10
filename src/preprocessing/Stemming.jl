@@ -53,6 +53,11 @@ function step1(w::String)
         w = step1b_helper(w)
     end
 
+    # Step 1c: y with ible
+    if endswith(w, "y") && has_vowel(w[1:end-1])
+        w = replace_suffix(w, "y", "i")
+    end
+
     return w
 end
 

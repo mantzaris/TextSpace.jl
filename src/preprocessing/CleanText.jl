@@ -1,4 +1,4 @@
-
+# TODO: Special Entity Removal
 
 function remove_punctuation(
     text::String; 
@@ -57,6 +57,7 @@ function clean_text(
     remove_punctuation::Bool=false,
     remove_symbols::Bool=false,
     remove_emojis::Bool=false,
+    case_transform::Symbol=:lower,
     extra_symbols::Vector{Char}=[]
 )
     #Unicode normalization (NFC) to standardize form
@@ -70,7 +71,11 @@ function clean_text(
     end
 
     #convert to lowercase (often done early, but after unicode normalize is safe)
-    text = lowercase(text)
+    if case_transform == :lower
+        text = lowercase(text)
+    elseif case_transform == :upper
+        text = uppercase(text)
+    end
 
     #remove punctuation (and possibly symbols)
     if remove_punctuation || remove_symbols || !isempty(extra_symbols)
