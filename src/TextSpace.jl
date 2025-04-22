@@ -16,30 +16,20 @@
 - **Contextualized Embeddings** – Dynamic word representations (e.g., BERT, GPT).
 - **Segment Embeddings** – Distinguish sentence pairs in models like BERT.
 - **Task-Specific Embeddings** – Used in instruction-tuned models (e.g., FLAN-T5, ChatGPT).
-
-## 3. Multimodal and Specialized Embeddings
-- **Knowledge Graph Embeddings** – Encode entities & relations (e.g., TransE, ComplEx, RotatE).
-- **Vision-Language Embeddings** – Align images and text (e.g., CLIP, Flamingo, GPT-4V).
-- **Audio Embeddings** – Speech representation (e.g., Whisper, Wav2Vec).
-- **Hybrid Embeddings** – Combine multiple embeddings (e.g., Flair: character + word + contextual).
 =#
 
 module TextSpace
 
 using Unicode
+using Reexport
 
-directories = ["preprocessing","embeddings","utils"]
+#load before using 
+include(joinpath(@__DIR__, "preprocessing", "Preprocessing.jl"))
+#now use
+@reexport using .Preprocessing
 
-for d in directories
-    for f in sort(readdir(joinpath(@__DIR__, d)))
-        if endswith(f, ".jl")
-            include(joinpath(@__DIR__, d, f))
-        end
-    end
-end
+# @reexport using .Embeddings # TODO:
 
-export clean_text, tokenize, build_vocabulary
-
-
-
+# package‑wide utilities
+# include("utils/StringExtras.jl")
 end #END MODULE

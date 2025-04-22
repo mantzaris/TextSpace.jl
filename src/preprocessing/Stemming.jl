@@ -24,9 +24,7 @@ function measure(w::String)
     return m 
 end
 
-function endswith(w::String, suffix::String) 
-    return length(w) >= length(suffix) && w[end-length(suffix)+1:end] == suffix 
-end
+
 
 function replace_suffix(w::String, suffix::String, repl::String) 
     return w[1:end-length(suffix)] * repl 

@@ -90,36 +90,44 @@
 You have SerializationUtilities.jl in utils/. Make sure your vocabulary-building methods have a standard approach for saving/loading the token dictionary (e.g., JSON, binary format).
 =#
 
+module Preprocessing
 
-"""
-    tokenize_word(text::String; mode::Symbol=:word) -> Vector{String}
+# always include sub‑files relative to THIS file
+include(joinpath(@__DIR__, "TextNormalization.jl"))
+include(joinpath(@__DIR__, "Stemming.jl"))
 
-Tokenizes the input text into a vector of tokens.  
-- If `mode` is `:word` (default), the text is split into word-level tokens.
-- If `mode` is `:char`, the text is split into individual characters.
+export stem_text, clean_text
 
-# Examples
-```julia
-julia> tokenize_word("Hello, Julia! 😊", mode=:word)
-["hello", ",", "julia", "!", "😊"]
-
-julia> tokenize_word("Hello, Julia! 😊", mode=:char)
-['h', 'e', 'l', 'l', 'o', ',', ' ', 'j', 'u', 'l', 'i', 'a', '!', ' ', '😊']
-```
-""" 
-function tokenize_word(text::String; mode::Symbol = :word) 
-    #TODO: optional strip punctuation
-    if mode == :word 
-        #Unicode-aware regex: # - [\p{L}\p{N}]+ matches sequences of letters, numbers, or underscores. 
-        #[^\s\p{L}\p{N}]+ matches one or more characters that are not whitespace or part of a word (e.g., punctuation, symbols, emoji). 
-        pattern = r"[\p{L}\p{N}]+|[^\s\p{L}\p{N}]+"
-        tokens = [m.match for m in eachmatch(pattern, text)]
-        return tokens 
-    elseif mode == :char 
-        return collect(text) 
-    else 
-        error("Unsupported tokenization mode: $mode. Use :word or :char.") 
-    end 
-end
+end #END MODULE
 
 
+# """
+#     tokenize_word(text::String; mode::Symbol=:word) -> Vector{String}
+
+# Tokenizes the input text into a vector of tokens.  
+# - If `mode` is `:word` (default), the text is split into word-level tokens.
+# - If `mode` is `:char`, the text is split into individual characters.
+
+# # Examples
+# ```julia
+# julia> tokenize_word("Hello, Julia! 😊", mode=:word)
+# ["hello", ",", "julia", "!", "😊"]
+
+# julia> tokenize_word("Hello, Julia! 😊", mode=:char)
+# ['h', 'e', 'l', 'l', 'o', ',', ' ', 'j', 'u', 'l', 'i', 'a', '!', ' ', '😊']
+# ```
+# """ 
+# function tokenize_word(text::String; mode::Symbol = :word) 
+#     #TODO: optional strip punctuation
+#     if mode == :word 
+#         #Unicode-aware regex: # - [\p{L}\p{N}]+ matches sequences of letters, numbers, or underscores. 
+#         #[^\s\p{L}\p{N}]+ matches one or more characters that are not whitespace or part of a word (e.g., punctuation, symbols, emoji). 
+#         pattern = r"[\p{L}\p{N}]+|[^\s\p{L}\p{N}]+"
+#         tokens = [m.match for m in eachmatch(pattern, text)]
+#         return tokens 
+#     elseif mode == :char 
+#         return collect(text) 
+#     else 
+#         error("Unsupported tokenization mode: $mode. Use :word or :char.") 
+#     end 
+# end
