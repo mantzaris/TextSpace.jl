@@ -34,52 +34,53 @@ The BPE tokenizer (`tok`) is mandatory when you request `:ids` or `:batch`.
 | `:tokens`    | `Vector{Vector{String}}`                 |
 | `:sentences` | `Vector{String}` (after splitting)       |
 """
-function process_document(text::AbstractString;
-                          tok::SubwordTokenizer,
-                          vocab::Union{Nothing,Vocabulary}=nothing;
-                          return::Symbol = :batch,
-                          kwargs...)
+function process_document(text::AbstractString,
+    tok;                              # SubwordTokenizer
+    vocab::Union{Nothing,Vocabulary} = nothing,
+    mode::Symbol                     = :batch,
+    kwargs...)
 
     opt = merge(DEFAULTS, Dict(kwargs))
 
-    #Paragraph split  (and unwrap hard-wraps)
-    paras = split_paragraphs(text;
-                             unwrap  = opt[:unwrap_lines]) |>
-            p -> filter_paragraphs(p; min_chars = opt[:paragraph_min_chars])
+    paras = split_paragraphs(text; unwrap = opt[:unwrap_lines])
+    paras = filter_paragraphs(paras; min_chars = opt[:paragraph_min_chars])
 
-    #Sentence split (optional)  → sentences :: Vector{String}
-    sentences = opt[:sentence_split] ?
-                vcat([split_sentences(p) for p in paras]...) :
-                paras
+    sentences = opt[:sentence_split] ? vcat([split_sentences(p) for p in paras]...) :
+    paras
 
-    return === :sentences && return sentences
-
-    # Tokenise each sentence  -> Vector{Vector{String}}
-    token_seqs = tokenize_batch(sentences;
-                                strip_punctuation = opt[:strip_punctuation],
-                                lower             = opt[:lower],
-                                remove_stopwords  = opt[:remove_stopwords],
-                                lemmatize         = opt[:lemmatize],
-                                stem              = opt[:stem],
-                                ngram             = opt[:ngram])
-
-    return === :tokens && return token_seqs
-
-    #Tokens -> ids  (BPE or word-level depending on args)
-    if vocab === nothing          # BPE route
-        id_seqs = [encode(tok, join(ts, ' ');
-                           add_special_tokens = opt[:add_special_tokens]) for ts in token_seqs]
-    else                          # word-level route
-        id_seqs = [tokens_to_ids(ts, vocab) for ts in token_seqs]
+    if mode == :sentences
+        return sentences
     end
 
-    return === :ids && return id_seqs
+    token_seqs = tokenize_batch(
+        sentences;
+        strip_punctuation = opt[:strip_punctuation],
+        lower             = opt[:lower],
+        remove_stopwords  = opt[:remove_stopwords],
+        lemmatize         = opt[:lemmatize],
+        stem              = opt[:stem],
+        ngram             = opt[:ngram]
+    )
 
-    # Pad to matrix  (sequence_length × batch)  ready for GPUs
-    pad_val = vocab === nothing ? tok.pad_id : opt[:pad_value]
-    batch   = pad_sequences(id_seqs; pad_value = pad_val)
-    return batch
+    if mode == :tokens
+        return token_seqs
+    end
+
+    if vocab === nothing                       # sub-word route
+        id_seqs = [encode(tok, join(ts, ' '); add_special_tokens = opt[:add_special_tokens])  for ts in token_seqs]
+        pad_val = tok.pad_id
+    else                                        # word route
+        id_seqs = [convert_tokens_to_ids(ts, vocab) for ts in token_seqs]
+        pad_val = vocab.unk_id
+    end
+
+    if mode == :ids
+        return id_seqs
+    end
+
+    return pad_sequences(id_seqs; pad_value = pad_val)
 end
+
 
 
 """
@@ -93,28 +94,34 @@ Stream paragraph windows so each batch has ≤ `max_tokens` tokens
 (according to the chosen tokenizer).  Useful for long docs.
 Returns an iterator of padded matrices.
 """
-function document_batch_iter(text; tok, vocab=nothing,
-                             max_tokens::Int=256, kwargs...)
 
-    # same paragraph splitting as above
-    paras = split_paragraphs(text; unwrap=true) |>
-            p -> filter_paragraphs(p; min_chars = 25)
+function document_batch_iter(text, tok;
+    vocab       = nothing,
+    max_tokens::Int = 256,
+    kwargs...)
 
-    wind = paragraph_windows(paras, max_tokens;
-                             stride = max_tokens,
-                             tokenizer = p -> encode(tok, p))
+
+    paras = split_paragraphs(text; unwrap = true)
+    paras = filter_paragraphs(paras; min_chars = 25)
+
+    win_iter, first_state = paragraph_windows(
+        paras, max_tokens;
+        stride    = max_tokens,
+        tokenizer = p -> encode(tok, p)
+    )
 
     function _iter(state)
-        chunk, nxt = iterate(wind, state)     # (Vector{String}, next_state)
-        chunk === nothing && return nothing
+    data = iterate(win_iter, state)         # (chunk, next_state) or nothing
+    data === nothing && return nothing
 
-        batch = process_document(join(chunk, "\n\n");
-                                 tok, vocab;
-                                 return = :batch,
-                                 kwargs...)
-
-        return batch, nxt
+    chunk, nxt = data
+    batch = process_document(join(chunk, "\n\n"), tok;
+            vocab = vocab,
+            mode  = :batch,
+            kwargs...)
+    return batch, nxt
     end
-    return _iter, 1
+
+    return _iter, first_state
 end
 

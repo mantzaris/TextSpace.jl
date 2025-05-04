@@ -13,9 +13,10 @@ Return a column-major matrix where each column is a padded/truncated sequence.
 * `trunc`    — `:pre` or `:post` (keep head or tail when truncating).
 """
 function pad_sequences(seqs::Vector{<:Vector{<:Integer}};
-                       maxlen::Union{Nothing,Int}=nothing;
-                       pad_value::Integer = 0,
-                       trunc::Symbol = :post)
+    maxlen::Union{Nothing,Int}=nothing,
+    pad_value::Integer = 0,
+    trunc::Symbol = :post)
+
 
     maxlen === nothing && (maxlen = maximum(length.(seqs)))
     m   = fill(pad_value, maxlen, length(seqs))

@@ -2,6 +2,23 @@
 
 using JSON
 
+
+struct Vocabulary
+    token2id::Dict{String,Int}
+    id2token::Vector{String}
+    counts::Dict{Int,Int}
+    unk_id::Int
+end
+
+Vocabulary() = Vocabulary(Dict{String,Int}(), String[], Dict{Int,Int}(), 0)
+
+
+
+
+
+
+
+
 function build_vocabulary(
     tokens::Vector{String};
     min_freq::Int=0,
@@ -305,8 +322,6 @@ function build_vocabulary_wordpiece(
     )
 end
 
-
-# ── IdMapping.jl  (or bottom of Vocabulary.jl) ───────────────────────
 
 """
     convert_tokens_to_ids(tokens, vocab;
