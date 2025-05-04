@@ -306,6 +306,82 @@ function build_vocabulary_wordpiece(
 end
 
 
+# ── IdMapping.jl  (or bottom of Vocabulary.jl) ───────────────────────
+
+"""
+    convert_tokens_to_ids(tokens, vocab;
+                          add_new=false,
+                          update_counts=true) → Vector{Int}
+
+Map string tokens to integer ids using `vocab::Vocabulary`.
+
+* If `add_new=true` unknown tokens are appended to the vocabulary
+  (needed while **training** the vocab).
+* If `update_counts=true` increments `vocab.counts[id]` for every hit.
+"""
+function convert_tokens_to_ids(tokens::Vector{String},
+                               vocab::Vocabulary;
+                               add_new::Bool      = false,
+                               update_counts::Bool = true)
+
+    out = Vector{Int}(undef, length(tokens))
+    for (i, tok) in enumerate(tokens)
+
+        id = get(vocab.token2id, tok, 0)        # 0 means OOV for now
+
+        if id == 0
+            if add_new
+                id = length(vocab.id2token) + 1
+                vocab.token2id[tok] = id
+                push!(vocab.id2token, tok)
+                update_counts && (vocab.counts[id] = 1)
+            else
+                id = vocab.unk_id
+                update_counts && (vocab.counts[id] = get(vocab.counts, id, 0) + 1)
+            end
+        else
+            update_counts && (vocab.counts[id] = get(vocab.counts, id, 0) + 1)
+        end
+
+        out[i] = id
+    end
+    return out
+end
+
+
+"""
+    convert_ids_to_tokens(ids, vocab) → Vector{String}
+
+Inverse mapping. Unknown ids return `"<unk>"` by convention.
+"""
+function convert_ids_to_tokens(ids::Vector{<:Integer}, vocab::Vocabulary)
+    unk = "<unk>"
+    toks = Vector{String}(undef, length(ids))
+    for (i, id) in enumerate(ids)
+        toks[i] = 1 ≤ id ≤ length(vocab.id2token) ? vocab.id2token[id] : unk
+    end
+    return toks
+end
+
+
+"""
+    convert_batch_tokens_to_ids(docs, vocab;
+                                pad_value = vocab.unk_id,
+                                kwargs...) → Matrix{Int}
+
+High-level helper: calls `convert_tokens_to_ids` on each document and
+pads to a column-major matrix via `pad_sequences` (from TextVectorization.jl).
+`docs` is a `Vector{Vector{String}}`.
+"""
+function convert_batch_tokens_to_ids(docs::Vector{Vector{String}},
+                                     vocab::Vocabulary;
+                                     pad_value::Int = vocab.unk_id,
+                                     kwargs...)
+
+    seqs = [convert_tokens_to_ids(d, vocab; kwargs...) for d in docs]
+    pad_sequences(seqs; pad_value)
+end
+
 
 function save_vocabulary(vocab::Dict, filename::String)
     open(filename, "w") do io
