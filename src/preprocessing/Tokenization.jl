@@ -35,14 +35,19 @@ function basic_tokenize(text::AbstractString; keep_whitespace::Bool=false)
 end
 
 # small helper functions
-apply_case(tok::String, lower::Bool) = lower ? lowercase(tok) : tok
+apply_case(tok::AbstractString, lower::Bool) =
+    lower ? lowercase(String(tok)) : String(tok)
 
+
+const _PUNCT_CHARS = Set{Char}(".,!?:;\"'’“”()[]{}<>")  # ← one-time cost
 """strip_punct(tok)  — remove leading/trailing punctuation."""
-strip_punct(tok::String) = strip(tok, Ref(".,!?:;\"'’“”()[]{}<>"))
+strip_punct(tok::AbstractString) = strip(String(tok), _PUNCT_CHARS)
 
-ngrams(tokens::Vector{String}, n::Int) =
-    n == 1 ? tokens :
-    [join(tokens[i:i+n-1], '_') for i in 1:length(tokens)-n+1]
+
+
+ngrams(tokens::Vector{<:AbstractString}, n::Int) =
+     n == 1 ? tokens :
+     [join(tokens[i:i+n-1], '_') for i in 1:length(tokens)-n+1]
 
 
 

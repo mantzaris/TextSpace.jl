@@ -115,7 +115,7 @@ end
 
 
 
-@testset "save_vocabulary → load_vocabulary round-trip" begin
+@testset "save_vocabulary -> load_vocabulary round-trip" begin
     vdict = build_vocabulary(["α","β","β","γ"])
     tmp   = tempname()
 
