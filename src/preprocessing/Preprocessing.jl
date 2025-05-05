@@ -1,7 +1,6 @@
 module Preprocessing
 
 include(joinpath(@__DIR__, "Vocabulary.jl"))          #  -> Vocabulary, convert_tokens_to_ids, …
-# include(joinpath(@__DIR__, "IdMapping.jl"))           #  -> convert_tokens_to_ids, ids↔tokens
 include(joinpath(@__DIR__, "TextNormalization.jl"))   #  -> clean_text / normalize_whitespace
 include(joinpath(@__DIR__, "Stemming.jl"))
 include(joinpath(@__DIR__, "Lemmatization.jl"))
@@ -14,311 +13,238 @@ include(joinpath(@__DIR__, "TextVectorization.jl"))   #  -> pad_sequences, tfidf
 include(joinpath(@__DIR__, "DocumentProcessing.jl"))  #  -> process_document, document_batch_iter
 
 
+# Export only the high-level pipeline functions
+export preprocess_for_char_embeddings,
+       preprocess_for_sentence_embeddings,
+       preprocess_for_paragraph_embeddings,
+       preprocess_for_subword_embeddings,
+       preprocess_for_document_embeddings,
+       preprocess_for_word_embeddings
+
+# --- Pipeline Function Implementations ---
+
 """
-    fit_subword_tokenizer(corpus_paths;
-                          vocab_size   = 32_000,
-                          model_type   = "bpe",
-                          model_prefix = "spm",
-                          kwargs...)          -> SubwordTokenizer
+    preprocess_for_char_embeddings(text::String, vocab::Vocabulary; clean_options=Dict(), char_options=Dict(), id_options=Dict()) -> Vector{Int}
 
-Learn a **pure-Julia Byte-Pair Encoding (BPE)** model from the text files
-in `corpus_paths` and return a ready-to-use `SubwordTokenizer`.  
-Call this **once** at project start, then reuse the tokenizer everywhere.
+Prepares text for character-level embeddings.
 
-### When to use
-* Before training or inferring any **sub-word** embedding model.
-* When you need a reproducible vocabulary:  
-  `Serialization.serialize("tok.bin", tok)`.
+Pipeline:
+1. (Optional) Cleans text using `CleanText.clean_text`.
+2. Tokenizes into characters (graphemes) using `CharProcessing.tokenize_char`.
+3. Converts characters to IDs using `CharProcessing.chars_to_ids`.
 
-### Examples
-```julia
-julia> using TextSpace
+# Arguments
+- `text::String`: The input text.
+- `vocab::Vocabulary`: A pre-built character vocabulary.
 
-# Train on two corpora, get a tokenizer with 24 k merges
-tok = fit_subword_tokenizer(["data/wiki.txt", "data/news.txt"];
-                            vocab_size = 24_000)
+# Keyword Arguments
+- `clean_options::Dict`: Options passed directly to `CleanText.clean_text` (e.g., `Dict(:case_transform=>:lower)`). Set to `nothing` to skip cleaning.
+- `char_options::Dict`: Options passed directly to `CharProcessing.tokenize_char` (e.g., `Dict(:keep_space=>true)`).
+- `id_options::Dict`: Options passed directly to `CharProcessing.chars_to_ids` (e.g., `Dict(:add_new=>false)`).
 
-# Persist for future sessions
-Serialization.serialize("tok.bin", tok)
-tok  = Serialization.deserialize("tok.bin")
-```
+# Returns
+- `Vector{Int}`: A vector of character IDs.
 """
-function fit_subword_tokenizer(corpus_paths;
-                               vocab_size   = 32_000,
-                               model_type   = "bpe",
-                               model_prefix = "spm",
-                               kwargs...)
-    model_path = train_bpe(corpus_paths;
-                           vocab_size   = vocab_size,
-                           model_type   = model_type,
-                           model_prefix = model_prefix,
-                           kwargs...)
-    return load_bpe(model_path)      # defined in SubwordTokenization.jl
+function preprocess_for_char_embeddings(text::String, vocab::Vocabulary;
+                                        clean_options::Union{Dict, Nothing}=Dict(),
+                                        char_options::Dict=Dict(),
+                                        id_options::Dict=Dict())
+    # 1. Optional Cleaning
+    processed_text = if clean_options !== nothing
+        clean_text(text; clean_options...)
+    else
+        text
+    end
+
+    # 2. Character Tokenization
+    chars = tokenize_char(processed_text; char_options...)
+
+    # 3. Convert to IDs
+    ids = chars_to_ids(chars, vocab; id_options...)
+
+    return ids
 end
 
-
 """
-    preprocess_document(text;
-                        tok,                       # SubwordTokenizer (REQUIRED)
-                        max_tokens    = 512,
-                        return        = :batch,    # :batch | :ids | :sentences
-                        kwargs...)                 -> Matrix / Vector
+    preprocess_for_sentence_embeddings(text::String; clean_options=Dict(), sentence_options=Dict()) -> Vector{String}
 
-**Whole document -> tensor** in one call.
+Prepares text for sentence-level embeddings (e.g., Sentence-BERT).
 
-1. Cleans & normalises  
-2. Splits into paragraphs & sentences  
-3. Encodes each sentence with the sub-word `tok`  
-4. Pads to `(≤max_tokens, n_sentences)` matrix if `return == :batch`
+Pipeline:
+1. Cleans text using `CleanText.clean_text`.
+2. Splits cleaned text into sentences using `SentenceProcessing.split_sentences`.
 
-### When to use
-* Sentence-embedding or classification models that accept batched
-  sentences (SBERT-style).
-* Quick inspection of sentence segmentation (`return = :sentences`).
+# Arguments
+- `text::String`: The input text.
 
-### Examples
-```julia
-julia> using TextSpace
-julia> x = preprocess_document(read("article.txt", String); tok)
-512x42 Matrix{Int32}
+# Keyword Arguments
+- `clean_options::Dict`: Options passed directly to `CleanText.clean_text` (e.g., `Dict(:remove_punctuation=>false)`).
+- `sentence_options::Dict`: Options passed directly to `SentenceProcessing.split_sentences`.
 
-# Just sentence strings
-julia> preprocess_document(text; tok, return=:sentences)[1:3]
-3-element Vector{String}:
- "Dr. Smith went home."
- "He slept."
- "Meanwhile, the cat played."
-```
+# Returns
+- `Vector{String}`: A vector of cleaned sentences.
 """
-function process_document(text::AbstractString,
-   tok;                     # SubwordTokenizer (positional)
-   stage::Symbol  = :batch,
-   max_tokens::Int = 512,
-   clean::Bool    = true,
-   lower::Bool    = true,
-   stem::Bool     = false,
-   lemmatize::Bool = false,
-   kwargs...)
+function preprocess_for_sentence_embeddings(text::String;
+                                            clean_options::Dict=Dict(),
+                                            sentence_options::Dict=Dict())
+    # 1. Cleaning
+    cleaned_text = clean_text(text; clean_options...)
 
-   # 1 · optional cleaning
-   if clean
-      text = clean_text(text)
-      text = normalize_whitespace(text)
-   end
+    # 2. Sentence Splitting
+    sentences = split_sentences(cleaned_text; sentence_options...)
 
-   # 2 · sentence split
-   sentences = split_sentences(text)
-
-   if stage == :sentences
-      return sentences
-   end
-
-   # 3 · tokenise
-   tokens = tokenize_batch(sentences;
-      lower     = lower,
-      stem      = stem,
-      lemmatize = lemmatize)
-
-   if stage == :tokens
-      return tokens
-   end
-
-   # 4 · sub-word encode  (tok is required for this helper)
-   idseqs = [encode(tok, join(t, ' '); add_special_tokens = true)
-   for t in tokens]
-
-   if stage == :ids
-      return idseqs
-   end
-
-   # 5 · pad to matrix
-   return pad_sequences(idseqs; pad_value = tok.pad_id)
+    return sentences
 end
 
-
 """
-    preprocess_paragraphs(text;
-                          tok,
-                          max_tokens = 256) -> Vector{Matrix{Int}}
+    preprocess_for_paragraph_embeddings(text::String; clean_options=Dict(), paragraph_options=Dict(), filter_options=Dict()) -> Vector{String}
 
-Split `text` into paragraphs, then into **windows** of <= `max_tokens`
-sub-word tokens.  Each window becomes a padded matrix.
+Prepares text for paragraph-level embeddings.
 
-### When to use
-* Long-form **retrieval-augmented generation (RAG)** or QA where you chunk
-  documents into fixed token budgets.
-* Streaming books or reports through a Transformer with a modest length
-  limit.
+Pipeline:
+1. Cleans text using `CleanText.clean_text`.
+2. Splits cleaned text into paragraphs using `ParagraphProcessing.split_paragraphs`.
+3. (Optional) Filters paragraphs using `ParagraphProcessing.filter_paragraphs`.
 
-### Examples 
-```julia
-julia> using TextSpace
-julia> batches = preprocess_paragraphs(read("novel.txt", String);
-                                       tok, max_tokens=256)
+# Arguments
+- `text::String`: The input text.
 
-julia> size.(batches) |> first
-(256, 11)   # 256 tokens x 11 sentences in first chunk
-```
+# Keyword Arguments
+- `clean_options::Dict`: Options passed directly to `CleanText.clean_text`.
+- `paragraph_options::Dict`: Options passed directly to `ParagraphProcessing.split_paragraphs` (e.g., `Dict(:unwrap=>true)`).
+- `filter_options::Union{Dict, Nothing}`: Options passed directly to `ParagraphProcessing.filter_paragraphs` (e.g., `Dict(:min_chars=>25)`). Set to `nothing` to skip filtering.
+
+# Returns
+- `Vector{String}`: A vector of cleaned (and potentially filtered) paragraphs.
 """
-function preprocess_sentences(text::AbstractString;
-   tok   = nothing,
-   vocab = nothing,
-   out::Symbol = :batch,          # :batch | :ids | :tokens | :sentences
-   kwargs...)
+function preprocess_for_paragraph_embeddings(text::String;
+                                             clean_options::Dict=Dict(),
+                                             paragraph_options::Dict=Dict(),
+                                             filter_options::Union{Dict, Nothing}=Dict())
+    # 1. Cleaning
+    cleaned_text = clean_text(text; clean_options...)
 
-sentences = split_sentences(text)
+    # 2. Paragraph Splitting
+    paragraphs = split_paragraphs(cleaned_text; paragraph_options...)
 
-   if tok !== nothing
-   idseqs = [encode(tok, s; add_special_tokens = true) for s in sentences]
+    # 3. Optional Filtering
+    if filter_options !== nothing
+        paragraphs = filter_paragraphs(paragraphs; filter_options...)
+    end
 
-   if out == :ids
-      return idseqs
-   elseif out == :sentences
-      return sentences
-   else                           # default :batch
-      return pad_sequences(idseqs; pad_value = tok.pad_id)
-      end
-   end
-
-   @assert vocab !== nothing "Need `vocab` when `tok` is not provided."
-
-   tokens = tokenize_batch(sentences; kwargs...)
-   idseqs = [convert_tokens_to_ids(t, vocab) for t in tokens]
-
-   if out == :tokens
-      return tokens
-   elseif out == :ids
-      return idseqs
-   else                               # :batch
-      return pad_sequences(idseqs; pad_value = vocab.unk_id)
-   end
+    return paragraphs
 end
 
+"""
+    preprocess_for_subword_embeddings(text::String, bpe_tokenizer; clean_options=Dict(), sentence_options=Dict(), encode_options=Dict()) -> Vector{Vector{Int}}
 
+Prepares text for subword-based embeddings (e.g., BERT).
 
+Pipeline:
+1. Cleans text using `CleanText.clean_text`.
+2. Splits cleaned text into sentences using `SentenceProcessing.split_sentences`.
+3. Encodes each sentence into subword IDs using `SubwordTokenization.encode`.
 
+# Arguments
+- `text::String`: The input text.
+- `bpe_tokenizer`: A pre-trained BPE tokenizer (e.g., from `BytePairEncoding.jl` or loaded via `SubwordTokenization.load_bpe`).
 
+# Keyword Arguments
+- `clean_options::Dict`: Options passed directly to `CleanText.clean_text`.
+- `sentence_options::Dict`: Options passed directly to `SentenceProcessing.split_sentences`.
+- `encode_options::Dict`: Options passed directly to `SubwordTokenization.encode` for each sentence (e.g., `Dict(:add_special_tokens=>true)`).
+
+# Returns
+- `Vector{Vector{Int}}`: A vector of vectors of subword IDs (one inner vector per sentence).
+"""
+function preprocess_for_subword_embeddings(text::String, bpe_tokenizer;
+                                           clean_options::Dict=Dict(),
+                                           sentence_options::Dict=Dict(),
+                                           encode_options::Dict=Dict())
+    # 1. Cleaning
+    cleaned_text = clean_text(text; clean_options...)
+
+    # 2. Sentence Splitting
+    sentences = split_sentences(cleaned_text; sentence_options...)
+
+    # 3. Encode each sentence
+    sentence_ids = [SubwordTokenization.encode(bpe_tokenizer, sentence; encode_options...) for sentence in sentences]
+
+    return sentence_ids
+end
 
 """
-    preprocess_sentences(text;
-                         tok      = nothing,     # sub-word if provided
-                         vocab    = nothing,     # else word-level IDs
-                         return   = :batch,      # :batch | :ids | :tokens
-                         kwargs...)              -> Matrix / Vector
+    preprocess_for_document_embeddings(text::String; clean_options=Dict()) -> String
 
-**Sentence-centric** pipeline.
+Prepares text for document-level embeddings (e.g., Doc2Vec) by cleaning.
 
-* If `tok` is given sub-word (BPE) ids.  
-* Otherwise pass a word-level `vocab`.
+Pipeline:
+1. Cleans text using `CleanText.clean_text`.
 
-### When to use
-* STS, NLI, or any model that consumes one sentence at a time.
-* Rapid word-level baselines without fitting a BPE tokenizer.
+Note: Some document embedding methods might require tokenized input. Consider using `preprocess_for_word_embeddings` and flattening the result, or modifying this function if needed.
 
-### Examples
-```julia
-julia> using TextSpace
+# Arguments
+- `text::String`: The input text.
 
-## sub-word mode
-ids   = preprocess_sentences(text; tok, return=:ids)   # Vector{Vector{Int}}
-batch = preprocess_sentences(text; tok)                # padded matrix
+# Keyword Arguments
+- `clean_options::Dict`: Options passed directly to `CleanText.clean_text` (e.g., `Dict(:remove_punctuation=>true, :case_transform=>:lower)`).
 
-## word mode
-vocab = Vocabulary(Dict{String,Int}(), String[], Dict{Int,Int}(), 0)
-batch_word = preprocess_sentences(text;
-                                  vocab=vocab, return=:batch)  # grows vocab
-```
+# Returns
+- `String`: The cleaned document text.
 """
-function preprocess_sentences(text::AbstractString;
-   tok      = nothing,
-   vocab    = nothing,
-   mode::Symbol = :batch,      # ← safe keyword
-   kwargs...)
+function preprocess_for_document_embeddings(text::String; clean_options::Dict=Dict())
+    # 1. Cleaning
+    cleaned_text = clean_text(text; clean_options...)
 
-   sentences = split_sentences(text)
+    return cleaned_text
+end
 
-   if tok !== nothing
-      idseqs = [encode(tok, s; add_special_tokens = true) for s in sentences]
+"""
+    preprocess_for_word_embeddings(text::String, vocab::Vocabulary; clean_options=Dict(), sentence_options=Dict(), tokenize_options=Dict(), id_options=Dict()) -> Vector{Vector{Int}}
 
-      if mode == :ids
-         return idseqs
-      elseif mode == :sentences
-         return sentences
-      elseif mode == :batch           # padded matrix
-         return pad_sequences(idseqs; pad_value = tok.pad_id)
-      else
-         error("Unknown mode $(mode). Use :batch | :ids | :sentences")
-      end
-   end
+Prepares text for word-level embeddings (e.g., Word2Vec, GloVe).
 
-   @assert vocab !== nothing "Provide `vocab` when `tok` is not given."
+Pipeline:
+1. Cleans text using `CleanText.clean_text`.
+2. Splits cleaned text into sentences using `SentenceProcessing.split_sentences`.
+3. Tokenizes each sentence into words using `Tokenization.tokenize`.
+4. Converts word tokens to IDs using `Tokenization.tokens_to_ids`.
 
-   tokens = tokenize_batch(sentences; kwargs...)
-   idseqs = [convert_tokens_to_ids(t, vocab) for t in tokens]
+# Arguments
+- `text::String`: The input text.
+- `vocab::Vocabulary`: A pre-built word vocabulary.
 
-   if mode == :tokens
-      return tokens
-   elseif mode == :ids
-      return idseqs
-   elseif mode == :batch
-      return pad_sequences(idseqs; pad_value = vocab.unk_id)
-   else
-      error("Unknown mode $(mode). Use :batch | :ids | :tokens")
-   end
+# Keyword Arguments
+- `clean_options::Dict`: Options passed directly to `CleanText.clean_text`.
+- `sentence_options::Dict`: Options passed directly to `SentenceProcessing.split_sentences`.
+- `tokenize_options::Dict`: Options passed directly to `Tokenization.tokenize` for each sentence (e.g., `Dict(:remove_stopwords=>true, :lemmatize=>true)`).
+- `id_options::Dict`: Options passed directly to `Tokenization.tokens_to_ids` for each sentence (e.g., `Dict(:add_new=>false)`).
+
+# Returns
+- `Vector{Vector{Int}}`: A vector of vectors of word token IDs (one inner vector per sentence).
+"""
+function preprocess_for_word_embeddings(text::String, vocab::Vocabulary;
+                                        clean_options::Dict=Dict(),
+                                        sentence_options::Dict=Dict(),
+                                        tokenize_options::Dict=Dict(),
+                                        id_options::Dict=Dict())
+    # 1. Cleaning
+    cleaned_text = clean_text(text; clean_options...)
+
+    # 2. Sentence Splitting
+    sentences = split_sentences(cleaned_text; sentence_options...)
+
+    # 3. Tokenize each sentence
+    tokenized_sentences = [Tokenization.tokenize(sentence; tokenize_options...) for sentence in sentences]
+
+    # 4. Convert tokens to IDs for each sentence
+    sentence_ids = [Tokenization.tokens_to_ids(tokens, vocab; id_options...) for tokens in tokenized_sentences]
+
+    return sentence_ids
 end
 
 
 
-"""
-    preprocess_chars(text;
-                     vocab,                   # char Vocabulary
-                     return = :batch,         # :batch | :ids | :tokens
-                     kwargs...)               -> Matrix / Vector
-
-Character-level (Unicode **grapheme cluster**) pipeline.
-
-### When to use
-* Char-CNNs, byte- or char-level language models, noisy-text robustness.
-
-### Examples
-```julia
-julia> using TextSpace
-
-# Build a character vocabulary (training phase)
-char_vocab = Vocabulary(Dict{String,Int}(), String[], Dict{Int,Int}(), 0)
-
-# Process a new string
-x = preprocess_chars("Café 👨‍🚀!"; vocab=char_vocab)  # padded matrix
-
-# Inspect char tokens
-preprocess_chars("naïve"; vocab=char_vocab, return=:tokens)
-# -> ["n", "a", "ï", "v", "e"]
-```
-"""
-function preprocess_chars(text::AbstractString;
-   vocab,
-   out::Symbol = :batch,              # :batch | :ids | :tokens
-   kwargs...)
-
-   chars = tokenize_char(text; kwargs...)
-   ids   = convert_tokens_to_ids(chars, vocab)
-
-   if out == :ids
-      return [ids]
-   elseif out == :tokens
-      return [chars]
-   else                                           # :batch
-      return pad_sequences([ids]; pad_value = vocab.unk_id)
-   end
-end
-
-
-
-export  fit_subword_tokenizer,
-        preprocess_document,
-        preprocess_paragraphs,
-        preprocess_sentences,
-        preprocess_chars
 
 
 

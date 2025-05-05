@@ -100,7 +100,6 @@ function document_batch_iter(text, tok;
     max_tokens::Int = 256,
     kwargs...)
 
-
     paras = split_paragraphs(text; unwrap = true)
     paras = filter_paragraphs(paras; min_chars = 25)
 
