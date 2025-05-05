@@ -7,6 +7,9 @@ include(joinpath(@__DIR__, "..", "src", "preprocessing", "TextVectorization.jl")
 include(joinpath(@__DIR__, "..", "src", "preprocessing", "Vocabulary.jl"))
 include(joinpath(@__DIR__, "..", "src", "preprocessing", "Tokenization.jl"))
 
+#test the textnormalization
+include("preprocessing_textnormalization_tests.jl")
+
 #test the vocabulary
 include("preprocessing_vocaculary_tests.jl")
 
