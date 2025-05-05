@@ -14,16 +14,11 @@ Vocabulary() = Vocabulary(Dict{String,Int}(), String[], Dict{Int,Int}(), 0)
 
 
 
-
-
-
-
-
 function build_vocabulary(
     tokens::Vector{String};
     min_freq::Int=0,
     max_vocab_size::Int=typemax(Int),
-    special_tokens::Vector{String}=[]
+    special_tokens::Vector{String} = String[]
 )
     #count frequencies
     freq = Dict{String, Int}()
@@ -53,10 +48,13 @@ function build_vocabulary(
     token_to_index = Dict{String, Int}()
     index_to_token = String[]
 
-    #insert special tokens first
+    
+    # insert special tokens first, but only once each
     for st in special_tokens
-        push!(index_to_token, st)
-        token_to_index[st] = length(index_to_token)
+        if !haskey(token_to_index, st)          # ← new guard
+            push!(index_to_token, st)
+            token_to_index[st] = length(index_to_token)
+        end
     end
 
     #insert remaining tokens, skipping duplicates
@@ -79,7 +77,7 @@ end
 function build_vocabulary_bpe(
     corpus::Vector{String};
     vocab_size::Int=30000,
-    special_tokens::Vector{String}=[]
+    special_tokens::Vector{String}=String[]
 )
     #convert each sentence into a list of "words", each word is "chars plus a special end symbol" or keep it simpler: each word => char-level tokens
     tokenized_sentences = [split(s) for s in corpus]
@@ -230,7 +228,7 @@ end
 function build_vocabulary_wordpiece(
     corpus::Vector{String};
     vocab_size::Int=30000,
-    special_tokens::Vector{String}=[]
+    special_tokens::Vector{String}=String[]
 )
     #start with a minimal set of tokens: the special tokens + [UNK], if not present
     base_tokens = union(special_tokens, ["[UNK]"])
