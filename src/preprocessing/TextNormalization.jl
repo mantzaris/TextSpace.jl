@@ -32,16 +32,11 @@ function normalize_whitespace(text::String;
 
     t = text                     # local working copy
 
-    ##########################################################################
-    # 1. drop zero-width / invisible code-points (ZWSP, ZWNJ, ZWJ, BOM)
-    ##########################################################################
+   
     if remove_zero_width
         t = replace(t, r"[\u200B\u200C\u200D\uFEFF]+" => "")
     end
 
-    ##########################################################################
-    # 2. collapse whitespace runs
-    ##########################################################################
     if preserve_newlines
         # keep '\n', but squeeze other blanks (space, tab, CR, FF) to one
         t = replace(t, r"[ \t\f\r]+" => " ")
@@ -52,9 +47,6 @@ function normalize_whitespace(text::String;
         t = replace(t, r"\s+" => " ")
     end
 
-    ##########################################################################
-    # 3. optionally strip leading / trailing blanks
-    ##########################################################################
     strip_ends && (t = strip(t))
 
     return t

@@ -3,9 +3,13 @@ using Test
 
 using Random
 
+
 include(joinpath(@__DIR__, "..", "src", "preprocessing", "TextVectorization.jl"))
 include(joinpath(@__DIR__, "..", "src", "preprocessing", "Vocabulary.jl"))
 include(joinpath(@__DIR__, "..", "src", "preprocessing", "Tokenization.jl"))
+
+#test stemming
+include("preprocessing_stemming_tests.jl")
 
 #test the textnormalization
 include("preprocessing_textnormalization_tests.jl")

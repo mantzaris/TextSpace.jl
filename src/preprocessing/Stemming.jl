@@ -153,7 +153,7 @@ function step5(w::String)
 end
 
 
-function porter_stem(word::String)
+function porter_stem(word::AbstractString)
     w = lowercase(word)
 
     w = step1(w)
