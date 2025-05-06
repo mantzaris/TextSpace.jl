@@ -13,14 +13,19 @@ Splits on **blank lines** (1+ empty lines).
 If `unwrap=true`, collapses hard-wrapped lines first.
 """
 function split_paragraphs(text::AbstractString;
-                          unwrap::Bool=true,
-                          normalize::Bool=true)
+    unwrap::Bool = true,
+    normalize::Bool = true)
 
-    unwrap && (text = unwrap_lines(text))
-    paras = split(text, PAR_SEP; keepempty=false)
-    normalize && (paras = [normalize_whitespace(strip(p)) for p in paras])
+    #coarse split on **blank lines**
+    paras = split(text, PAR_SEP; keepempty = false)
+
+    #optional hard-wrap removal *within* each paragraph
+    unwrap   && (paras = [unwrap_lines(p) for p in paras])
+    normalize && (paras = [normalize_whitespace(String(strip(p))) for p in paras])
+
     return paras
 end
+
 
 """
     filter_paragraphs(paras; min_chars=25) → Vector{String}

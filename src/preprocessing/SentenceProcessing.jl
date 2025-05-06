@@ -18,10 +18,10 @@ function split_sentences(text::AbstractString;
     starts, sentences = 1, String[]
     for m in eachmatch(SENTEND, text)
         stop  = m.offset + length(m.match) - 1
-        chunk = @view text[starts:stop]
-        # skip false split if we ended on an abbreviation
+        raw   = @view text[starts:stop]
+        chunk = strip(raw)                       # strip **before** testing
         if !occursin(abbreviations, chunk)
-            push!(sentences, strip(chunk))
+           push!(sentences, chunk)
             starts = stop + 1
         end
     end
@@ -33,14 +33,23 @@ function split_sentences(text::AbstractString;
 end
 
 
-strip_outer_quotes(s::AbstractString) =
-    (startswith(s, ('"', '“')) && endswith(s, ('"', '”'))) ? s[2:end-1] : s
+function strip_outer_quotes(s::AbstractString)
+    startswith(s, ('"', '“')) && endswith(s, ('"', '”')) || return s
+
+    # compute the index *after* the first character and *before* the last one
+    lo = nextind(s, firstindex(s))      # safe start
+    hi = prevind(s, lastindex(s))       # safe end
+
+    return s[lo:hi]
+end
 
 struct SlidingSentenceWindow{T}
     sents::Vector{T}
     max_tokens::Int
     stride::Int
 end
+
+Base.IteratorSize(::Type{<:SlidingSentenceWindow}) = Base.SizeUnknown()
 
 Base.iterate(win::SlidingSentenceWindow, state = 1) =
     state > length(win.sents) ? nothing :
