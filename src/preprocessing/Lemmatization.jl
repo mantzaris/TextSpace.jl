@@ -704,9 +704,9 @@ function lemmatize_text(text::String; language::String="english")
     return join(lemmas, ' ') 
 end
 
-function lemmatize_word(word::String; language::String="english")
+function lemmatize_word(word::AbstractString; language::String="english")
     #convert to lowercase to match dictionary patterns 
-    lw = lowercase(word)
+    lw = lowercase(String(word))
 
     if language == "english"
         if haskey(irregular_nouns_english, lw)
