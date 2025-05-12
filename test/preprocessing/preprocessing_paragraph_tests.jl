@@ -1,4 +1,4 @@
-include(joinpath(@__DIR__, "..", "src", "preprocessing", "ParagraphProcessing.jl"))
+include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "ParagraphProcessing.jl"))
 
 
 # handy dummy tokenizer: counts whitespace-separated tokens

@@ -1,1 +1,3 @@
-# Code for character-level embeddings (CharLSTM, CNN-based, etc.).
+
+using Flux
+using Statistics

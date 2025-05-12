@@ -1,4 +1,4 @@
-include(joinpath(@__DIR__, "..", "src", "preprocessing", "SubwordTokenization.jl"))
+include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "SubwordTokenization.jl"))
 
 
 need_bpe = false

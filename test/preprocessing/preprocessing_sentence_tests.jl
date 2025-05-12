@@ -1,4 +1,4 @@
-include(joinpath(@__DIR__, "..", "src", "preprocessing", "SentenceProcessing.jl"))
+include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "SentenceProcessing.jl"))
 
 
 

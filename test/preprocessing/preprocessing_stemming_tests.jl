@@ -1,4 +1,4 @@
-include(joinpath(@__DIR__, "..", "src", "preprocessing", "Stemming.jl"))
+include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "Stemming.jl"))
 
 
 @testset "porter_stem basic cases" begin
