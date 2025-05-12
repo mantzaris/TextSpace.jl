@@ -5,10 +5,9 @@ using Random
 using Downloads 
 
 
-include("preprocessing/preprocessing_test_gateway.jl")
+include("CharacterEmbeddings/character_embeddings_test_gateway.jl")
 
-
-
+# include("preprocessing/preprocessing_test_gateway.jl")
 
 
 @testset "basic tests" begin

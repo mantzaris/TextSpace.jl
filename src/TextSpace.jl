@@ -28,7 +28,9 @@ include(joinpath(@__DIR__, "preprocessing", "Preprocessing.jl"))
 #now use
 @reexport using .Preprocessing
 
-# @reexport using .Embeddings # TODO:
+# high-level embeddings
+include(joinpath(@__DIR__, "embeddings", "CharacterEmbeddings.jl"))
+@reexport using .CharacterEmbeddings 
 
 # package‑wide utilities
 # include("utils/StringExtras.jl")
