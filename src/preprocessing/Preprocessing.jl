@@ -1,5 +1,6 @@
 module Preprocessing
 
+include(joinpath(@__DIR__, "CleanText.jl"))
 include(joinpath(@__DIR__, "Vocabulary.jl"))          #  -> Vocabulary, convert_tokens_to_ids, …
 include(joinpath(@__DIR__, "TextNormalization.jl"))   #  -> clean_text / normalize_whitespace
 include(joinpath(@__DIR__, "Stemming.jl"))
@@ -103,14 +104,14 @@ function preprocess_for_char_embeddings(corpus_input::Union{AbstractString, Stri
                                         char_options::Dict=Dict(),
                                         id_options::Dict=Dict())
 
-    # --- Define Default Options --- 
+    
     # Minimal cleaning suitable for character models
     default_clean_options = Dict(
         :unicode_normalize => true,
-        :remove_accents => false,
-        :remove_punctuation => false,
-        :remove_symbols => false,
-        :remove_emojis => false,
+        :do_remove_accents => false,
+        :do_remove_punctuation => false,
+        :do_remove_symbols => false,
+        :do_remove_emojis => false,
         :case_transform => :none # Usually keep case for char models
     )
     # Merge user options with defaults
@@ -118,56 +119,53 @@ function preprocess_for_char_embeddings(corpus_input::Union{AbstractString, Stri
 
     default_id_options = Dict(:add_new=>false, :update_counts=>true)
     final_id_options = merge(default_id_options, id_options)
-    # --- End Default Options --- 
+    
 
-    # 1. Read Corpus (if file path)
+    #read Corpus (if file path)
     text = if isfile(corpus_input)
         read(corpus_input, String)
     else
         String(corpus_input) # Ensure it's a String
     end
 
-    # 2. Cleaning (using defaults + user options)
+    #cleaning (using defaults + user options)
     cleaned_text = clean_text(text; final_clean_options...)
 
-    # 3. Character Tokenization
+    #character Tokenization
     chars = tokenize_char(cleaned_text; char_options...)
 
-    # 4. Determine/Build Vocabulary
-    final_vocab::Vocabulary
-    if vocab !== nothing
-        final_vocab = vocab
-    else
-        # Build character vocabulary
-        default_vocab_build_opts = Dict(:min_freq => 1, :special_tokens => ["<unk>"])
-        vocab_build_opts = merge(default_vocab_build_opts, vocab_options)
-        
-        if !("<unk>" in get(vocab_build_opts, :special_tokens, []))
-            push!(vocab_build_opts[:special_tokens], "<unk>")
-        end
-
-        vocab_dict = build_vocabulary(chars; vocab_build_opts...)
-
-        # Create Vocabulary struct instance
-        unk_token = "<unk>"
-        unk_id = get(vocab_dict["token_to_index"], unk_token, 0)
+    #determine/Build Vocabulary
+    if vocab === nothing
+        opts = merge(Dict(:min_freq=>1, :special_tokens=>["<unk>"]), vocab_options)
+        haskey(opts, :special_tokens) || (opts[:special_tokens] = ["<unk>"])
+    
+        vdict   = build_vocabulary(chars; opts...)
+        unk_id  = get(vdict["token_to_index"], "<unk>", 0)
         if unk_id == 0
-            @warn "\\'\'<unk>\\' token not found in generated vocabulary, using ID 0. Ensure \\'\'<unk>\\' is in special_tokens."
+            push!(vdict["index_to_token"], "<unk>")
+            vdict["token_to_index"]["<unk>"] = length(vdict["index_to_token"])
+            unk_id = vdict["token_to_index"]["<unk>"]
         end
-        # Initialize counts based on build_vocabulary output if available, else empty
-        counts_dict = haskey(vocab_dict, "freq") ? 
-                      Dict(get(vocab_dict["token_to_index"], tok, 0) => count 
-                           for (tok, count) in vocab_dict["freq"] 
-                           if haskey(vocab_dict["token_to_index"], tok)) :
-                      Dict{Int,Int}()
+        counts = Dict{Int,Int}()
 
-        final_vocab = VocabularyModule.Vocabulary(vocab_dict["token_to_index"],
-                                             vocab_dict["index_to_token"],
-                                             counts_dict,
-                                             unk_id)
+        if haskey(vdict, "freq")
+            for (tok, cnt) in vdict["freq"]
+                id = get(vdict["token_to_index"], tok, 0)   # 0 if token was filtered
+                id == 0 && continue                         # skip missing tokens
+                counts[id] = cnt
+            end
+        end
+
+    
+        final_vocab = Vocabulary(vdict["token_to_index"],
+                                 vdict["index_to_token"],
+                                 counts,
+                                 unk_id)
+    else
+        final_vocab = vocab
     end
 
-    # 5. Convert characters to IDs
+    #convert characters to IDs
     ids = chars_to_ids(chars, final_vocab; final_id_options...)
 
     return (char_ids=ids,

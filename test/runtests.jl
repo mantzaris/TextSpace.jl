@@ -2,16 +2,21 @@ using TextSpace
 using Test
 
 using Random
+using Downloads 
 
 
-include(joinpath(@__DIR__, "..", "src", "preprocessing", "TextNormalization.jl"))
-include(joinpath(@__DIR__, "..", "src", "preprocessing", "TextVectorization.jl"))
 include(joinpath(@__DIR__, "..", "src", "preprocessing", "Vocabulary.jl"))
 include(joinpath(@__DIR__, "..", "src", "preprocessing", "Tokenization.jl"))
+include(joinpath(@__DIR__, "..", "src", "preprocessing", "CharProcessing.jl"))
+include(joinpath(@__DIR__, "..", "src", "preprocessing", "TextNormalization.jl"))
+include(joinpath(@__DIR__, "..", "src", "preprocessing", "TextVectorization.jl"))
 include(joinpath(@__DIR__, "..", "src", "preprocessing", "SubwordTokenization.jl"))
 include(joinpath(@__DIR__, "..", "src", "preprocessing", "SentenceProcessing.jl"))
 include(joinpath(@__DIR__, "..", "src", "preprocessing", "ParagraphProcessing.jl"))
 
+
+#test char pipeline preprocessing
+include("preprocessing_char_pipeline_tests.jl")
 
 #test document processing
 include("preprocessing_document_tests.jl")
