@@ -2,6 +2,8 @@ module CharacterEmbeddings
 
 using Flux, Random
 using Statistics: mean 
+using Random: randn
+
 
 include(joinpath(@__DIR__, "CharacterEmbeddingUtilities", "__init__.jl"))
 using .CharacterEmbeddingUtilities: build_char_pairs
@@ -17,7 +19,8 @@ Flux.@layer SkipGramModel
 
 
 function SkipGramModel(vocab_size::Int, emb_dim::Int)
-    SkipGramModel(Flux.Embedding(vocab_size, emb_dim))
+    w = randn(Float32, emb_dim, vocab_size) .* 0.01f0 #sigma≈0.01
+    SkipGramModel(Flux.Embedding(w))
 end
 
 sigm(x) = 1 ./ (1 .+ exp.(-x))      
