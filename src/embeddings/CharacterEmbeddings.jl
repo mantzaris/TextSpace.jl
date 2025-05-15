@@ -1,6 +1,7 @@
 module CharacterEmbeddings
 
 using Flux, Random
+using Zygote: Buffer
 using Statistics: mean 
 using Random: randn
 
@@ -38,47 +39,109 @@ function dot_scores(m::SkipGramModel, centers, contexts)
     return vec(sum(z_c .* z_o; dims = 1))
 end
 
+function cbow_dot_scores(m::SkipGramModel,
+    ctxs::Vector{<:AbstractVector{Int}},
+    centres::Vector{Int})
+    W   = embeddings(m)                    # emb_dim x |V|
+    out = Vector{Float32}(undef, length(centres))
+    @inbounds for (k, cid) in pairs(centres)
+        ctx_vec = mean(W[:, ctxs[k]]; dims = 2)  # emb_dim × 1
+        ctr_vec = @view W[:, cid]               # emb_dim
+        out[k]  = sum(ctx_vec .* ctr_vec)
+    end
+    return out
+end
+
+function cbow_loss(m, pos_ctx, pos_ctr, neg_ctx, neg_ctr)
+    l_pos = log.(sigm.(cbow_dot_scores(m, pos_ctx, pos_ctr)))
+    l_neg = log.(sigm.(-cbow_dot_scores(m, neg_ctx, neg_ctr)))
+    return -mean(vcat(l_pos, l_neg))
+end
+
+
+function cbow_scores(m::SkipGramModel,
+    ctxs::Vector{<:AbstractVector{Int}},
+    centres::Vector{Int})
+
+    @assert length(ctxs) == length(centres)
+    n = length(centres)
+
+    buf = Buffer(Vector{Float32}(undef, n))   # Zygote-approved scratch
+
+    for k in 1:n
+        # mean(context embeddings) – `mean` gives emb_dim×1 matrix
+        μ_ctx   = @view mean(m.emb(ctxs[k]); dims = 2)[:, 1]
+        centre  = m.emb(centres[k])           # emb_dim vector
+        buf[k]  = sum(μ_ctx .* centre)        # dot-product
+    end
+
+    return copy(buf)                          # ordinary tracked Vector
+end
+
+function cbow_loss(m, pos_ctx, pos_ctr, neg_ctx, neg_ctr)
+    l_pos = log.(sigm.(cbow_scores(m, pos_ctx, pos_ctr)))
+    l_neg = log.(sigm.(-cbow_scores(m, neg_ctx, neg_ctr)))
+    return -mean(vcat(l_pos, l_neg))
+end
+
+
 function train!(ids::Vector{Int}, vocab;
-    objective::Symbol = :skipgram,
-    emb_dim::Int = 128,
-    radius::Int = 5,
-    epochs::Int = 5,
-    batch::Int = 1024,
-    k_neg::Int = 5,
-    lr = 1e-2,
-    rng = Random.GLOBAL_RNG)
+        objective::Symbol = :skipgram,
+        emb_dim::Int = 128,
+        radius::Int = 5,
+        epochs::Int = 5,
+        batch::Int = 1024,
+        k_neg::Int = 5,
+        lr = 1e-2,
+        rng = Random.GLOBAL_RNG)
 
-    @assert objective == :skipgram  "only :skipgram supported for now"
+    @assert objective ∈ (:skipgram, :cbow)
 
-    centers, contexts = build_char_pairs(ids; mode=:skipgram, radius=radius, rng=rng)
-    N          = length(centers)
+    p1, p2   = build_char_pairs(ids; mode=objective,
+                            radius=radius, rng=rng)
+    if objective == :skipgram
+        centres, contexts = p1, p2
+        lossfun = sg_loss
+    else
+        contexts, centres = p1, p2    # CBOW order!
+        lossfun = cbow_loss
+    end
+
+    N          = length(centres)
     vocab_size = length(vocab.id2token)
-
-    model = SkipGramModel(vocab_size, emb_dim)
-    opt   = Flux.Adam(lr)
-
-    # pre-allocate negative buffers
-    neg_c = similar(centers, batch*k_neg)
-    neg_o = similar(contexts, batch*k_neg)
+    model      = SkipGramModel(vocab_size, emb_dim)
+    opt        = Flux.Adam(lr)
 
     for epoch in 1:epochs
         for i in 1:batch:N
-            j      = min(i+batch-1, N)
-            pos_c  = centers[i:j]
-            pos_o  = contexts[i:j]
-    
-            # negative sampling
-            neg_o  = rand(rng, 1:vocab_size, length(pos_o)*k_neg)
-            neg_c  = repeat(pos_c, k_neg)          # length(pos_o)*k_neg
-    
-            gs = Flux.gradient(()->sg_loss(model, pos_c, pos_o, neg_c, neg_o),
-                               Flux.params(model))
+            j = min(i+batch-1, N)
+
+            if objective == :skipgram
+                pc  = centres[i:j]
+                po  = contexts[i:j]
+                nc  = repeat(pc, k_neg)
+                no  = rand(rng, 1:vocab_size, length(po)*k_neg)
+
+                gs = gradient(() -> lossfun(model, pc, po, nc, no),
+                            Flux.params(model))
+
+            else      #  CBOW
+                pcx  = contexts[i:j]                # Vector{Vector{Int}}
+                pctr = centres[i:j]
+                ncx  = vcat(Iterators.repeated(pcx, k_neg)...)  # copy refs OK
+                nctr = rand(rng, 1:vocab_size, length(pctr)*k_neg)
+
+                gs = gradient(() -> lossfun(model, pcx, pctr, ncx, nctr),
+                            Flux.params(model))
+            end
+
             Flux.Optimise.update!(opt, Flux.params(model), gs)
         end
         @info "epoch $epoch finished"
     end
     return model
 end
+
 
 
 embeddings(m::SkipGramModel) = cpu(m.emb.weight)          # emb_dim times vocab
@@ -96,6 +159,7 @@ function vector(m::SkipGramModel, vocab, ch::AbstractString)
     id = get(vocab.token2id, ch, vocab.unk_id)
     return @view embeddings(m)[:, id]   # alias, no copy
 end
+
 
 
 

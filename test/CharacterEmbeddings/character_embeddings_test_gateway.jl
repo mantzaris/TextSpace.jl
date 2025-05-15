@@ -516,3 +516,158 @@ end
     id_dot   = vocab.token2id["."]
     @test cos(emb[:, id_comma], emb[:, id_dot]) < 0.99   # commas not equal stops
 end
+
+
+#---------------------
+#CBOW tests
+make_vocab(N) = let
+    tok2id = Dict(string(i)=>i for i in 1:N)
+    tok2id["<unk>"] = N + 1
+    V(tok2id, [string.(1:N)..., "<unk>"], Dict{Int,Int}(), N + 1)
+end
+
+@testset "CBOW utilities" begin
+    ids = 1:10 |> collect
+
+    C, O = CE.build_char_pairs(ids;
+                               mode   = :cbow,
+                               win    = 5,
+                               stride = 5,
+                               radius = 2,
+                               rng    = MersenneTwister(0))
+
+    @test length(C) == length(O)               # same number of tuples
+    @test all(length.(C) .== 4)                # 2·radius context tokens
+
+    # find the tuple whose centre is 3
+    idx = findfirst(==(3), O)
+    @test idx !== nothing                     # such a pair must exist
+
+    ctx = C[idx]
+    @test 1 in ctx && 5 in ctx && 3 ∉ ctx     # context = [1,2,4,5] in some order
+end
+
+@testset "CBOW training smoke-run" begin
+    ids   = rand(1:6, 800)                       # small fake corpus
+    vocab = make_vocab(6)
+
+    model = CE.train!(ids, vocab;
+                      objective = :cbow,
+                      emb_dim   = 16,
+                      batch     = 128,
+                      epochs    = 1,
+                      rng       = MersenneTwister(42))
+
+    E = CE.embeddings(model)
+    @test size(E) == (16, length(vocab.id2token))
+    @test Statistics.std(vec(E)) > 0             # not all equal / zero
+    @test all(isfinite, E)
+end
+
+@testset "deterministic CBOW" begin
+    rng_pairs = MersenneTwister(99)
+    ids       = rand(rng_pairs, 1:5, 1_000)
+    vocab     = make_vocab(5)
+
+    Random.seed!(123)
+    m1 = CE.train!(ids, vocab;
+                   objective = :cbow,
+                   epochs = 1, emb_dim = 8, rng = copy(rng_pairs))
+
+    Random.seed!(123)
+    m2 = CE.train!(ids, vocab;
+                   objective = :cbow,
+                   epochs = 1, emb_dim = 8, rng = copy(rng_pairs))
+
+    @test isequal(CE.embeddings(m1), CE.embeddings(m2))
+end
+
+
+@testset "CBOW loss drops" begin
+    ids   = repeat(1:4, 250)                      # tiny corpus (1 000 tokens)
+    vocab = make_vocab(4)
+
+    #  fixed probe batch
+    k_neg = 5                                     # negatives per pair
+    C, O  = CE.build_char_pairs(ids; mode=:cbow,
+                                win=20, stride=20, radius=1,
+                                rng = MersenneTwister(11))
+    C, O  = C[1:64],  O[1:64]                     # 64 probe pairs
+
+    # corresponding negative samples (same ctx, random centre ids)
+    rng_neg  = MersenneTwister(12)
+    neg_ctx  = vcat(ntuple(_->C, k_neg)...)       # repeat contexts k_neg times
+    neg_ctr  = rand(rng_neg, 1:length(vocab.id2token), length(O)*k_neg)
+
+    #  baseline loss
+    Random.seed!(321)
+    init = CE.SkipGramModel(length(vocab.id2token), 16)
+    l0   = CE.cbow_loss(init, C, O, neg_ctx, neg_ctr)
+
+    #  train for a few epochs
+    Random.seed!(321)              # same initial weights as `init`
+    trained = CE.train!(ids, vocab;
+                        objective = :cbow,
+                        epochs    = 5,
+                        emb_dim   = 16,
+                        batch     = 128,
+                        rng       = MersenneTwister(321))
+
+    l1 = CE.cbow_loss(trained, C, O, neg_ctx, neg_ctr)
+
+    @test l1 < l0                  # training should lower the (probe) loss
+end
+
+
+
+@testset "CBOW - user-workflow big-picture" begin
+    PP = TextSpace.Preprocessing
+
+    #corpus (≈1 kB after the repeat)
+    raw_text = repeat("""
+        Thoroughly conscious ignorance is the prelude to every real advance in science. — James Clerk Maxwell
+
+        The important thing is to know how to take all things quietly. — Michael Faraday
+
+        The secret we should never let the game-masters know is that they don't need any rules. — Gary Gygax
+
+        Squire Trelawney, Dr. Livesey, and the rest of these gentlemen having asked me to write down the whole
+        particulars about Treasure Island, from the beginning to the end,
+        keeping nothing back but the bearings of the island, and that only because there is still treasure not
+        yet lifted, I take up my pen in the year of grace 17-, and go back to the time when my father kept the
+        'Admiral Benbow' inn, and the brown old seaman, with the sabre-cut, first took up his lodging under
+        our roof. — Robert Louis Stevenson, *Treasure Island*
+        """, 5)           
+
+    # preprocessing directly from the string (from_file = false) 
+    out   = PP.preprocess_for_char_embeddings(raw_text; from_file = false)
+    ids   = out.char_ids
+    vocab = out.vocabulary
+
+    @test length(ids) ≥ 500
+    @test haskey(vocab.token2id, ",")
+
+    #CBOW training (3 epochs, 32-dim)
+    model = CE.train!(ids, vocab;
+                      objective = :cbow,
+                      epochs    = 3,
+                      emb_dim   = 32,
+                      batch     = 256,
+                      rng       = MersenneTwister(4242))
+
+    emb = CE.embeddings(model)
+    @test size(emb, 2) == length(vocab.id2token)
+    @test all(isfinite, emb)
+
+    #trivial semantic sanity check: ',' vs '.' are not identical
+    cos(a,b) = dot(a,b) / (norm(a)*norm(b) + eps())
+    id_comma = vocab.token2id[","]
+    id_dot   = vocab.token2id["."]
+    @test cos(emb[:, id_comma], emb[:, id_dot]) < 0.99
+end
+
+
+
+
+
+
