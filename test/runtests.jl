@@ -4,6 +4,8 @@ using Test
 using Random
 using Downloads 
 
+include(joinpath(@__DIR__, "..", "src", "preprocessing", "Vocabulary.jl"))
+
 
 include("CharacterEmbeddings/character_embeddings_test_gateway.jl")
 
