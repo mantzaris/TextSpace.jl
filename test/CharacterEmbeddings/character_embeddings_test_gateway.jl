@@ -286,4 +286,89 @@ end
 
 
 
+@testset "real-text corpus smoke-run (French)" begin
+    #from https://www.amazon.com/Moisson-rouge/dp/2266268082
+    excerpt = """
+        Aux heures les plus noires de l'Ancienne République, alors que les 
+        Chevaliers Jedi combattent les Seigneurs Sith et leurs armées impitoyables, 
+        Darth Scabrous poursuit son rêve fanatique sur le point de devenir une réalité cauchemardesque.
+        Parmi les Jedi du Corps Agricole, Hestizo Trace ppossède un extraordinaire talent: 
+        un don avec les plantes qui lui a permis d'élever sa chère et précieuse orchidée noire. 
+        Une fleur rare dont doit s'emparer à tout prix l'émissaire de Darth Scabrous. 
+        Car elle est l'ingrédient final d'une préparation funeste, censée offrir l'immortalité.
+        """
 
+    mktemp() do path, io
+        write(io, excerpt)
+        close(io)
+
+        out = preprocess_for_char_embeddings(path)
+        ids, vocab = out.char_ids, out.vocabulary
+
+        @test length(ids) >= 300                    # > one full window
+        @test haskey(vocab.token2id, "é")          # accented char kept
+
+        model = CE.train!(ids, vocab;
+                          epochs = 1,
+                          emb_dim = 16,
+                          batch  = 128,
+                          rng    = MersenneTwister(314))
+
+        emb = CE.embeddings(model)
+        @test size(emb, 2) == length(vocab.id2token)
+        @test all(isfinite, emb)                   # no NaNs / Infs
+    end
+end
+
+
+
+@testset "real-text corpus smoke-run" begin
+    # from https://ew.com/star-wars-the-living-force-exclusive-excerpt-qui-gon-obi-wan-8610658
+    excerpt = """ 
+        The Jedi have always traveled the stars, defending peace and justice across the galaxy. 
+        But the galaxy is changing, and the Jedi Order along with it. 
+        More and more, the Order finds itself focused on the future of the Republic, secluded on Coruscant, 
+        where the twelve members of the Jedi Council weigh crises on a galactic scale.
+        As yet another Jedi Outpost left over from the Republic's golden age is set to be decommissioned on the 
+        planet Kwenn, Qui-Gon Jinn challenges the Council about the Order's increasing isolation. 
+        Mace Windu suggests a bold response: All twelve Jedi Masters will embark on a goodwill 
+        mission to help the planet and to remind the people of the galaxy that the 
+        Jedi remain as stalwart and present as they have been across the ages.
+        """
+
+    mktemp() do path, io
+        write(io, excerpt)
+        close(io)
+
+        out = preprocess_for_char_embeddings(path)
+        ids, vocab = out.char_ids, out.vocabulary
+
+        @test length(ids) >= 300                    # plenty of characters
+        @test haskey(vocab.token2id, "J")          # capital letter kept
+
+        model = CE.train!(ids, vocab;
+                          epochs = 1,
+                          emb_dim = 16,
+                          batch  = 128,
+                          rng    = MersenneTwister(314))
+
+        emb = CE.embeddings(model)
+        @test size(emb, 2) == length(vocab.id2token)
+        @test all(isfinite, emb)                   # no NaNs / Infs
+    end
+end
+
+
+# @testset "vector helper returns correct slice" begin
+#     ids   = repeat(1:4, 200)                       # 800 chars
+#     tok2id = Dict(string(i)=>i for i in 1:4); tok2id["<unk>"]=5
+#     vocab  = V(tok2id, ["1","2","3","4","<unk>"], Dict{Int,Int}(), 5)
+
+#     model = CE.train!(ids, vocab; epochs=1, emb_dim=8, batch=128,
+#                       rng=MersenneTwister(7))
+
+#     for ch in ["1","2","3","<unk>"]
+#         col = CE.embeddings(model)[:, vocab.token2id[ch]]
+#         @test col == CE.vector(model, vocab, ch)
+#     end
+# end
