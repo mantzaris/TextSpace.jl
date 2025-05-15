@@ -473,27 +473,33 @@ end
     PP = TextSpace.Preprocessing
 
     raw_text = repeat("""
-        It is a truth universally acknowledged, that a single man in possession
-        of a good fortune, must be in want of a wife. — Jane Austen, Pride &
-        Prejudice.
+        Thoroughly conscious ignorance is the prelude to every real advance in science. James Clerk Maxwell 
 
-        It was the best of times, it was the worst of times. — Charles Dickens,
-        A Tale of Two Cities.
-        """, 5)                          # ≈1 kB – plenty of characters
+        The important thing is to know how to take all things quietly. Michael Faraday
 
-    # ---------- PRE-PROCESS -------------------------------------------
-    ids, vocab = let
+        The secret we should never let the gamemasters know is that they don't need any rules. Gary Gygax
+
+        Squire Trelawney, Dr. Livesey, and the rest of these gentlemen having asked me to write down the whole
+        particulars about Treasure Island, from the beginning to the end, 
+        keeping nothing back but the bearings of the island, 
+        and that only because there is still treasure not yet lifted, I take up my pen in the year of grace 17-, 
+        and go back to the time when my father kept the "Admiral Benbow" inn, and the brown old seaman, with the 
+        sabre cut, first took up his lodging under our roof. Robert Louis Stevenson, Treasure Island
+        """, 5)                          # 1 kB - plenty of characters
+
+
+        ids, vocab = let
         mktemp() do path, io
             write(io, raw_text); close(io)             # save corpus once
-            out = PP.preprocess_for_char_embeddings(path)
+            out = PP.preprocess_for_char_embeddings(raw_text; from_file=false)
             out.char_ids, out.vocabulary
         end
     end
 
-    @test length(ids) ≥ 500
+    @test length(ids) >= 500
     @test haskey(vocab.token2id, ",")
 
-    # ---------- TRAIN --------------------------------------------------
+
     model = CE.train!(ids, vocab;
                       epochs = 3,
                       emb_dim = 32,
@@ -504,9 +510,9 @@ end
     @test size(emb, 2) == length(vocab.id2token)
     @test all(isfinite, emb)
 
-    # ---------- quick nearest-neighbour sanity -------------------------
+
     cos(a,b) = dot(a,b)/(norm(a)*norm(b)+eps())
     id_comma = vocab.token2id[","]
     id_dot   = vocab.token2id["."]
-    @test cos(emb[:, id_comma], emb[:, id_dot]) < 0.99   # commas ≠ stops
+    @test cos(emb[:, id_comma], emb[:, id_dot]) < 0.99   # commas not equal stops
 end

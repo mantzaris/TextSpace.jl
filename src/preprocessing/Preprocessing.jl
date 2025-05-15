@@ -27,6 +27,7 @@ export preprocess_for_char_embeddings,
 
 """
     preprocess_for_char_embeddings(corpus_input::Union{AbstractString, String};
+                                         from_file::Bool = true,
                                          vocab::Union{Vocabulary, Nothing}=nothing,
                                          vocab_options::Dict=Dict(),
                                          clean_options::Dict=Dict(),
@@ -98,6 +99,7 @@ result = preprocess_for_char_embeddings(text;
 ```
 """
 function preprocess_for_char_embeddings(corpus_input::Union{AbstractString, String};
+                                        from_file::Bool = true,
                                         vocab::Union{Vocabulary, Nothing}=nothing,
                                         vocab_options::Dict=Dict(),
                                         clean_options::Dict=Dict(),
@@ -122,11 +124,9 @@ function preprocess_for_char_embeddings(corpus_input::Union{AbstractString, Stri
     
 
     #read Corpus (if file path)
-    text = if isfile(corpus_input)
-        read(corpus_input, String)
-    else
-        String(corpus_input) # Ensure it's a String
-    end
+    text = from_file && isfile(corpus_input) ?
+           read(corpus_input, String) :
+           String(corpus_input)
 
     #cleaning (using defaults + user options)
     cleaned_text = clean_text(text; final_clean_options...)
