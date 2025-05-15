@@ -73,33 +73,74 @@ end
 
 
 @testset "loss drops" begin
-    #timy corpus  (1_000 tokens, ids 1-5)
-    ids   = repeat(1:5, 200)   # Vector{Int} length 1000
+    #tiny corpus & vocabulary (ids 1to5 + <unk>=6)
+    ids     = repeat(1:5, 200)
+    tok2id  = Dict(string(i)=>i for i in 1:5);  tok2id["<unk>"] = 6
+    vocab   = V(tok2id, [string.(1:5)..., "<unk>"], Dict{Int,Int}(), 6)
 
-    tok2id = Dict(string(i)=>i for i in 1:5)
-    tok2id["<unk>"] = 6
-    id2tok = [string.(1:5)..., "<unk>"]
-    vocab  = V(tok2id, id2tok, Dict{Int,Int}(), 6)
-    
-    #initial random model, measure baseline loss
-    init_model = CE.SkipGramModel(length(vocab.id2token), 16)
-    l1 = CE.sg_loss(init_model,
-                    [1], [2], repeat([1],5), rand(1:length(vocab.id2token), 5))
+    #fixed probe batch: 50 skip-gram pairs + negatives
+    C, O = CE.build_char_pairs(ids; mode=:skipgram, win=20, stride=20,
+                            radius=1, rng = MersenneTwister(77))
+    sel  = 1:50;   C, O = C[sel], O[sel]
 
-    #train for two epochs on the tiny corpus
-    trained = CE.train!(ids, vocab;
-                        epochs = 2,
-                        emb_dim = 16,
-                        lr     = 0.05,
-                        batch  = 64,
-                        rng    = MersenneTwister(1))
+    rng_neg = MersenneTwister(88)
+    kneg    = 5
+    neg_O   = rand(rng_neg, 1:length(vocab.id2token), length(O)*kneg)
+    neg_C   = repeat(C, kneg)
 
-    #get the loss again on the trained model
-    l2 = CE.sg_loss(trained,
-                    [1], [2], repeat([1],5), rand(1:length(vocab.id2token), 5))
+    #baseline loss with reproducible initial weights
+    Random.seed!(321)
+    model0 = CE.SkipGramModel(length(vocab.id2token), 16)
+    l1 = CE.sg_loss(model0, C, O, neg_C, neg_O)
 
-    @test l2 < l1  #loss should be going down
+    #train for 5 epochs starting from the same init
+    Random.seed!(321)
+    model = CE.train!(ids, vocab;
+                      epochs = 10,
+                      emb_dim = 16,
+                      lr     = 0.02,
+                      batch  = 128,
+                      rng    = MersenneTwister(1))
+
+    l2 = CE.sg_loss(model, C, O, neg_C, neg_O)
+
+    @test l2 < l1 #averaged loss must decrease
 end
+
+
+@testset "loss improves with more epochs" begin
+    #synthetic corpus (10_000 tokens, ids 1to5)
+    big_ids  = repeat(1:5, 2_000)            # 10 000 tokens
+    tok2id   = Dict(string(i)=>i for i in 1:5);  tok2id["<unk>"] = 6
+    vocab6   = V(tok2id, [string.(1:5)...,"<unk>"], Dict{Int,Int}(), 6)
+
+    #fixed probe batch (same idea as previous test)
+    using TextSpace.CharacterEmbeddings.CharacterEmbeddingUtilities: build_char_pairs
+    Cp, Op = build_char_pairs(big_ids; mode=:skipgram, win=40, stride=40,
+                              radius=2, rng=MersenneTwister(90))
+    Cp, Op = Cp[1:100], Op[1:100]    # 100 probe pairs
+    kneg   = 5
+    neg_O  = rand(MersenneTwister(91),
+                  1:length(vocab6.id2token), length(Op)*kneg)
+    neg_C  = repeat(Cp, kneg)
+
+    #train 3 epochs, then 6 epochs from the SAME initial weights
+    Random.seed!(555)
+    model3 = CE.train!(big_ids, vocab6;
+                       epochs = 3, emb_dim = 32, lr = 0.02,
+                       batch  = 256, rng = MersenneTwister(1))
+
+    Random.seed!(555)       # identical init again
+    model6 = CE.train!(big_ids, vocab6;
+                       epochs = 6, emb_dim = 32, lr = 0.02,
+                       batch  = 256, rng = MersenneTwister(1))
+
+    l3 = CE.sg_loss(model3, Cp, Op, neg_C, neg_O)
+    l6 = CE.sg_loss(model6, Cp, Op, neg_C, neg_O)
+
+    @test l6 <= l3  # six epochs never worse than three
+end
+
 
 
 @testset "save / reload" begin
@@ -125,4 +166,41 @@ end
 end
 
 
+@testset "OOV triggers BoundsError" begin
+    #model with vocab_size = 4  (ids 1to4)
+    model = CE.SkipGramModel(4, 8)  # emb_dim = 8
+
+    # id 5 is outside the valid range => should raise BoundsError
+    @test_throws BoundsError CE.dot_scores(model, [1], [5])
+end
+
+
+function safe_idx(id, vocab_size, unk_id)
+    return 1 <= id <= vocab_size ? id : unk_id
+end
+
+function dot_scores(m::CE.SkipGramModel, centers, contexts; unk_id = size(m.emb.weight, 2))
+    safe_idx(x) = 1 ≤ x ≤ size(m.emb.weight,2) ? x : unk_id
+    ctx = map(safe_idx, contexts)
+    zc  = m.emb(centers)
+    zo  = m.emb(ctx)
+    return vec(sum(zc .* zo; dims = 1))
+end
+
+@testset "dot_scores rejects OOV ids" begin
+    m = CE.SkipGramModel(4, 8)        # vocab size = 4
+    @test_throws BoundsError CE.dot_scores(m, [1], [5])
+end
+
+
+@testset "batch boundary safety" begin
+    ids   = repeat(1:4, 130)                    # 520 tokens
+    tok2id = Dict(string(i)=>i for i in 1:4); tok2id["<unk>"]=5
+    vocab  = V(tok2id, ["1","2","3","4","<unk>"], Dict{Int,Int}(), 5)
+
+    # batch=256 will force one full batch + one short batch
+    model = CE.train!(ids, vocab; epochs=1, batch=256, lr=0.02, emb_dim=8)
+
+    @test !any(isnan, CE.embeddings(model))
+end
 
