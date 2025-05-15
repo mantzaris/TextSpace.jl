@@ -145,7 +145,7 @@ end
 
 @testset "save / reload" begin
     #toy corpus & vocabulary
-    ids   = repeat(1:3, 100)                     # 300 tokens, ids ∈ 1:3
+    ids   = repeat(1:3, 100)                     # 300 tokens, ids in 1:3
     tok2id = Dict("1"=>1, "2"=>2, "3"=>3, "<unk>"=>4)
     id2tok = ["1","2","3","<unk>"]
     vocab  = V(tok2id, id2tok, Dict{Int,Int}(), 4)
@@ -198,9 +198,92 @@ end
     tok2id = Dict(string(i)=>i for i in 1:4); tok2id["<unk>"]=5
     vocab  = V(tok2id, ["1","2","3","4","<unk>"], Dict{Int,Int}(), 5)
 
-    # batch=256 will force one full batch + one short batch
+    # batch=256 will force one full batch plus one short batch
     model = CE.train!(ids, vocab; epochs=1, batch=256, lr=0.02, emb_dim=8)
 
     @test !any(isnan, CE.embeddings(model))
 end
+
+
+
+using TextSpace.Preprocessing: preprocess_for_char_embeddings
+
+@testset "pipeline smoke-run" begin
+    #make the raw text long enough (>128 chars)
+    raw = repeat("Hello 😊 — hello! ", 10)        # around 180 chars
+
+    out   = preprocess_for_char_embeddings(raw)
+    ids   = out.char_ids
+    vocab = out.vocabulary
+
+    @test length(ids) > 128                      # enough for pair builder
+    @test haskey(vocab.token2id, "H")            # capital H is in vocab
+
+    # 2.  One-epoch training should run without NaNs
+    model = CE.train!(ids, vocab;
+                      epochs = 1,
+                      emb_dim = 8,
+                      batch  = 32,   #small batch for speed
+                      rng    = MersenneTwister(123))
+
+    E = CE.embeddings(model)
+    @test size(E, 2) == length(vocab.id2token)   # correct width
+    @test !any(isnan, E)              #finite embeddings
+end
+
+@testset "negative-sampling sweep" begin
+    ids    = repeat(1:4, 400)                 # 4times400 = 1600 tokens
+    tok2id = Dict(string(i)=>i for i in 1:4); tok2id["<unk>"]=5
+    vocab  = V(tok2id, ["1","2","3","4","<unk>"], Dict{Int,Int}(), 5)
+
+    for k in 1:6
+        m = CE.train!(ids, vocab;
+                      epochs = 1,
+                      emb_dim = 8,
+                      batch  = 128,
+                      k_neg  = k,
+                      rng    = MersenneTwister(100+k))
+        @test !any(isnan, CE.embeddings(m))
+    end
+end
+
+@testset "batch size = 1 edge-case" begin
+    ids    = rand(1:5, 150)                  # 150 tokens
+    tok2id = Dict(string(i)=>i for i in 1:5); tok2id["<unk>"]=6
+    vocab  = V(tok2id, [string.(1:5)...,"<unk>"], Dict{Int,Int}(), 6)
+
+    m = CE.train!(ids, vocab;
+                  epochs = 1,
+                  emb_dim = 8,
+                  batch  = 1,                # single-sample batches
+                  rng    = MersenneTwister(7))
+
+    @test !any(isnan, CE.embeddings(m))
+end
+
+
+@testset "Unicode corpus" begin
+    # 200 plus characters, plenty of multi-byte codepoints
+    txt = repeat("🎉 café 🐍 ", 25)            # about 225 visible chars
+
+    mktemp() do path, io
+        write(io, txt)                        # save corpus to a short path
+        close(io)
+
+        out = preprocess_for_char_embeddings(path)  # <- file-input branch
+        @test length(out.char_ids) > 128            # enough for windows
+        @test haskey(out.vocabulary.token2id, "🎉") # emoji survived
+
+        m = CE.train!(out.char_ids, out.vocabulary;
+                      epochs = 1,
+                      emb_dim = 8,
+                      batch  = 64,
+                      rng    = MersenneTwister(99))
+
+        @test !any(isnan, CE.embeddings(m))         # finite embeddings
+    end
+end
+
+
+
 
