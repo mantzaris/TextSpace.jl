@@ -9,7 +9,7 @@ include(joinpath(@__DIR__, "CharacterEmbeddingUtilities", "__init__.jl"))
 using .CharacterEmbeddingUtilities: build_char_pairs
 
 
-export train!, embeddings, save_embeddings  
+export train!, embeddings, save_embeddings, vector  
 
 
 struct SkipGramModel
@@ -90,6 +90,13 @@ function save_embeddings(path, m::SkipGramModel, vocab)
         end
     end
 end
+
+"Return the embedding vector for the given character (or <unk> fallback)."
+function vector(m::SkipGramModel, vocab, ch::AbstractString)
+    id = get(vocab.token2id, ch, vocab.unk_id)
+    return @view embeddings(m)[:, id]   # alias, no copy
+end
+
 
 
 end # module

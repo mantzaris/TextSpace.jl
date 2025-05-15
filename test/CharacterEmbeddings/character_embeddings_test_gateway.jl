@@ -4,6 +4,8 @@ using Statistics
 
 const CE = TextSpace.CharacterEmbeddings
 const V  = TextSpace.Preprocessing.Vocabulary
+const PP = TextSpace.Preprocessing
+
 
 @testset "Character-Embeddings - training smoke-run" begin
     
@@ -359,16 +361,152 @@ end
 end
 
 
-# @testset "vector helper returns correct slice" begin
-#     ids   = repeat(1:4, 200)                       # 800 chars
-#     tok2id = Dict(string(i)=>i for i in 1:4); tok2id["<unk>"]=5
-#     vocab  = V(tok2id, ["1","2","3","4","<unk>"], Dict{Int,Int}(), 5)
+@testset "vector helper returns correct slice" begin
+    ids   = repeat(1:4, 200)                       # 800 chars
+    tok2id = Dict(string(i)=>i for i in 1:4); tok2id["<unk>"]=5
+    vocab  = V(tok2id, ["1","2","3","4","<unk>"], Dict{Int,Int}(), 5)
 
-#     model = CE.train!(ids, vocab; epochs=1, emb_dim=8, batch=128,
-#                       rng=MersenneTwister(7))
+    model = CE.train!(ids, vocab; epochs=1, emb_dim=8, batch=128,
+                      rng=MersenneTwister(7))
 
-#     for ch in ["1","2","3","<unk>"]
-#         col = CE.embeddings(model)[:, vocab.token2id[ch]]
-#         @test col == CE.vector(model, vocab, ch)
-#     end
-# end
+    for ch in ["1","2","3","<unk>"]
+        col = CE.embeddings(model)[:, vocab.token2id[ch]]
+        @test col == CE.vector(model, vocab, ch)
+    end
+end
+
+@testset "nearest-neighbour sanity" begin
+    using LinearAlgebra: dot, norm 
+
+    # throw-away tiny model
+    ids    = repeat(1:4, 200)
+    tok2id = Dict(string(i)=>i for i in 1:4);  tok2id["<unk>"] = 5
+    vocab  = V(tok2id, ["1","2","3","4","<unk>"], Dict{Int,Int}(), 5)
+
+    model = CE.train!(ids, vocab; epochs = 1, emb_dim = 8,
+                      batch  = 128, rng = MersenneTwister(11))
+
+    emb = CE.embeddings(model)
+    cosine(a,b) = dot(a,b) / (norm(a) * norm(b) + eps())
+
+    sims = [cosine(emb[:,1], emb[:,j]) for j in 1:size(emb,2)]
+    @test argmax(sims) == 1                  # self-similarity highest
+end
+
+
+@testset "sentence encoding helper" begin
+    using LinearAlgebra: norm
+    using Statistics: mean
+    using TextSpace.Preprocessing:
+          tokenize_char, chars_to_ids, pad_sequences
+    
+    ids      = repeat(1:4, 100)
+    tok2id   = Dict(string(i)=>i for i in 1:4);  tok2id["<unk>"] = 5
+    vocab    = V(tok2id, ["1","2","3","4","<unk>"], Dict{Int,Int}(), 5)
+
+    model = CE.train!(ids, vocab; epochs=1, emb_dim=8,
+                      batch=128, rng=MersenneTwister(123))
+
+    #encode two DIFFERENT in-vocab sentences
+    sentences = ["1112", "4443"]            #these digits are in vocab
+    id_seqs   = [chars_to_ids(tokenize_char(s), vocab) for s in sentences]
+    mat       = pad_sequences(id_seqs; pad_value=vocab.unk_id)   # L x 2
+
+    vecs      = CE.embeddings(model)[:, mat]          # 8 x L x 2
+    sent_repr = dropdims(mean(vecs; dims=2), dims=2)'  # 2 x 8
+
+    @test size(sent_repr) == (2, 8)
+    @test all(isfinite, sent_repr)
+    @test norm(sent_repr[1, :] .- sent_repr[2, :]) > 0   # now different
+end
+
+
+
+@testset "user-workflow smoke-run" begin
+    PP = TextSpace.Preprocessing
+    corpus = ["Hello world!", "Hello there,", "Good-bye world."]
+
+    #  make a >128-character corpus and store it in a temp file 
+    bigtxt = join(repeat(corpus, 20), ' ')     # 360 chars
+    ids, vocab = let
+        mktemp() do path, io
+            write(io, bigtxt); close(io)                # write once
+            out = PP.preprocess_for_char_embeddings(path)
+            out.char_ids, out.vocabulary
+        end
+    end
+
+    @test length(ids) ≥ 128
+    @test haskey(vocab.token2id, "H")
+
+    #  train a tiny model 
+    model = CE.train!(ids, vocab; epochs=2, emb_dim=16,
+                      batch=128, rng=MersenneTwister(2025))
+    emb   = CE.embeddings(model)
+
+    # single-character lookup
+    @test norm(emb[:, vocab.token2id["H"]]) > 0
+
+    # sentence encoder (mean of character vectors)
+    encode(sent) = mean(emb[:, PP.chars_to_ids(PP.tokenize_char(sent), vocab)];
+                         dims=2) |> vec
+    s1, s2, s3 = encode.(corpus)
+    cosine(a,b) = dot(a,b) / (norm(a)*norm(b) + eps())
+    @test cosine(s1, s2) >= cosine(s1, s3)      # Hello  closer to each other
+
+    # save / reload round-trip 
+    tmp = tempname()*".tsv"
+    CE.save_embeddings(tmp, model, vocab)
+
+    parsed = [(split(l, '\t')[1],
+               parse.(Float64, split(l, '\t')[2:end])) for l in eachline(tmp)]
+    first_tok, first_vec = parsed[1]
+    col_vec = emb[:, vocab.token2id[first_tok]]
+
+    @test isapprox(vec(first_vec), vec(col_vec); atol=1e-6)
+
+    rm(tmp; force=true)
+end
+
+
+@testset "user-workflow big-picture" begin
+    PP = TextSpace.Preprocessing
+
+    raw_text = repeat("""
+        It is a truth universally acknowledged, that a single man in possession
+        of a good fortune, must be in want of a wife. — Jane Austen, Pride &
+        Prejudice.
+
+        It was the best of times, it was the worst of times. — Charles Dickens,
+        A Tale of Two Cities.
+        """, 5)                          # ≈1 kB – plenty of characters
+
+    # ---------- PRE-PROCESS -------------------------------------------
+    ids, vocab = let
+        mktemp() do path, io
+            write(io, raw_text); close(io)             # save corpus once
+            out = PP.preprocess_for_char_embeddings(path)
+            out.char_ids, out.vocabulary
+        end
+    end
+
+    @test length(ids) ≥ 500
+    @test haskey(vocab.token2id, ",")
+
+    # ---------- TRAIN --------------------------------------------------
+    model = CE.train!(ids, vocab;
+                      epochs = 3,
+                      emb_dim = 32,
+                      batch  = 256,
+                      rng    = MersenneTwister(4242))
+
+    emb = CE.embeddings(model)
+    @test size(emb, 2) == length(vocab.id2token)
+    @test all(isfinite, emb)
+
+    # ---------- quick nearest-neighbour sanity -------------------------
+    cos(a,b) = dot(a,b)/(norm(a)*norm(b)+eps())
+    id_comma = vocab.token2id[","]
+    id_dot   = vocab.token2id["."]
+    @test cos(emb[:, id_comma], emb[:, id_dot]) < 0.99   # commas ≠ stops
+end
