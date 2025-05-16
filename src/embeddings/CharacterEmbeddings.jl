@@ -1,6 +1,7 @@
 module CharacterEmbeddings
 
 using Flux, Random
+using Flux: softplus
 using Zygote: Buffer
 using Statistics: mean 
 using Random: randn
@@ -27,9 +28,16 @@ end
 sigm(x) = 1 ./ (1 .+ exp.(-x))      
 
 function sg_loss(m, pos_c, pos_o, neg_c, neg_o)
-    l_pos = log.(sigm.(dot_scores(m, pos_c, pos_o)))
-    l_neg = log.(sigm.(-dot_scores(m, neg_c, neg_o)))
-    return -mean(vcat(l_pos, l_neg))
+    pos = dot_scores(m, pos_c, pos_o)        # length = B
+    neg = dot_scores(m, neg_c, neg_o)        # length = B*k
+    return mean( vcat( softplus.(-pos),      # log σ(pos)
+                       softplus.( neg) ) )   # log σ(-neg)
+end
+
+function cbow_loss(m, ctxs, ctrs, neg_ctxs, neg_ctrs)
+    pos = cbow_scores(m, ctxs, ctrs)
+    neg = cbow_scores(m, neg_ctxs, neg_ctrs)
+    return mean( vcat( softplus.(-pos), softplus.(neg) ) )
 end
 
 
@@ -52,11 +60,6 @@ function cbow_dot_scores(m::SkipGramModel,
     return out
 end
 
-function cbow_loss(m, pos_ctx, pos_ctr, neg_ctx, neg_ctr)
-    l_pos = log.(sigm.(cbow_dot_scores(m, pos_ctx, pos_ctr)))
-    l_neg = log.(sigm.(-cbow_dot_scores(m, neg_ctx, neg_ctr)))
-    return -mean(vcat(l_pos, l_neg))
-end
 
 
 function cbow_scores(m::SkipGramModel,
@@ -69,7 +72,7 @@ function cbow_scores(m::SkipGramModel,
     buf = Buffer(Vector{Float32}(undef, n))   # Zygote-approved scratch
 
     for k in 1:n
-        # mean(context embeddings) – `mean` gives emb_dim×1 matrix
+        # mean(context embeddings) - `mean` gives emb_dim×1 matrix
         μ_ctx   = @view mean(m.emb(ctxs[k]); dims = 2)[:, 1]
         centre  = m.emb(centres[k])           # emb_dim vector
         buf[k]  = sum(μ_ctx .* centre)        # dot-product
@@ -159,7 +162,7 @@ function vector(m::SkipGramModel, vocab, ch::AbstractString)
     id = get(vocab.token2id, ch, vocab.unk_id)
     return @view embeddings(m)[:, id]   # alias, no copy
 end
-
+vector(m::SkipGramModel, vocab, ch::Char) = vector(m, vocab, string(ch)) 
 
 
 
