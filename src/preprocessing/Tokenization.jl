@@ -109,7 +109,7 @@ tokenize_batch(docs::Vector{<:AbstractString}; kwargs...) =
 """
     tokens_to_ids(tokens, vocab; add_new=false) -> Vector{Int}
 """
-function tokens_to_ids(tokens::Vector{String},
+function tokens_to_ids(tokens::Vector{<:AbstractString},
                        vocab::Vocabulary;
                        add_new::Bool = false)
 

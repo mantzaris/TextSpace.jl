@@ -161,10 +161,124 @@ julia> nearest_sentence('?')
  (" CHAPTER VII.   A Mad Tea-Party", 0.6041056519919575)
  ("CHAPTER VIII.", 0.5875109533598397)
 
+```
 
 
+# Word Embeddings Ex
+
+```julia
+using Downloads, TextSpace, Random, LinearAlgebra, Statistics
+
+const WE = TextSpace.WordEmbeddings
+
+const PP = TextSpace.Preprocessing  # helpers for cleaning / tokenising
+
+alice_url = "https://www.gutenberg.org/files/11/11-0.txt"
+
+tmpfile = joinpath(mktempdir(), "alice_words.txt")
+
+Downloads.download(alice_url, tmpfile)
+
+# `preprocess_for_word_embeddings` returns a vector‐of‐sentences, each a vector of IDs
+prep = PP.preprocess_for_word_embeddings(tmpfile; from_file = true,
+                                                min_count = 5) # drop rare words
+
+sent_ids = prep.word_ids #Vector{Vector{Int}}
+
+vocab = prep.vocabulary
+
+flat_ids = vcat(sent_ids...) # 1-D corpus for Skip-Gram/CBOW training
+
+@show length(flat_ids) # approximately 25 000 tokens after trimming
+
+@show length(vocab.id2token) # unique words remaining
+
+model = WE.train!(flat_ids, vocab;
+                  objective = :skipgram,
+                  emb_dim   = 64, #embedding dimension
+                  batch     = 1024,
+                  epochs    = 5,
+                  k_neg     = 5,
+                  rng       = MersenneTwister(123))
+
+E = WE.embeddings(model) #embedding is a 64 by |V| matrix (CPU Array)
+
+cosine(a,b) = dot(a,b) / (norm(a)*norm(b) + eps())
+
+function nearest(tok; k = 5)
+    v  = WE.vector(model, vocab, tok)
+    sims = [(t, cosine(v, col))
+            for (t,col) in zip(vocab.id2token, eachcol(E))]
+    sort!(sims; by = last, rev = true)[1:k]
+end
+
+nearest("alice")      # closest words to 'alice'
+5-element Vector{Tuple{String, Float64}}:
+ ("alice", 1.0)
+ ("said", 0.7302538750833167)
+ ("to", 0.6439354006261235)
+ ("it", 0.6217598049069093)
+ ("she", 0.6119838841651302)
+
+nearest("rabbit")
+5-element Vector{Tuple{String, Float64}}:
+ ("rabbit", 1.0000000896666614)
+ ("white", 0.818244167158882)
+ ("saw", 0.37895408892625565)
+ ("hastily", 0.3704275813369187)
+ ("three", 0.36109669318023857)
+
+julia> nearest("cat")
+5-element Vector{Tuple{String, Float64}}:
+ ("cat", 1.0000000764600523)
+ ("right", 0.42743823270147446)
+ ("mad", 0.42369448323556974)
+ ("hatter", 0.42302991414277147)
+ ("caterpillar", 0.3938569272541852)
+
+julia> function encode_sentence(s::AbstractString)
+           ids = PP.tokens_to_ids(split(lowercase(s)), vocab; add_new = false)
+           isempty(ids) && return zeros(Float32, size(E,1))   # all OOV -> zero vec
+           return mean(E[:, ids]; dims = 2) |> vec
+       end
+
+julia> sentences = split(read(tmpfile, String), '\n'; keepempty = false)
+2496-element Vector{SubString{String}}:
+ "*** START OF THE PROJECT GUTENBERG EBOOK 11 ***"
+ "[Illustration]"
+...
+
+julia> svectors  = encode_sentence.(sentences)
+
+# Which sentence is 'closest to 'wonderland'?
+julia> target = WE.vector(model, vocab, "cat")
+
+julia> idx = argmax(cosine.(Ref(target), svectors))
+2393
+
+julia> @show sentences[idx]
+sentences[idx] = "    For this must ever be"
+"    For this must ever be"
+
+julia> using TSne, Plots
+
+julia> proj = tsne(permutedims(E), 2, 50) #|V| by 2
+
+julia> scatter(proj[:,1], proj[:,2];
+               text        = vocab.id2token,
+               markersize  = 0,
+               legend      = false,
+               title       = "t-SNE of Alice-in-Wonderland **word** embeddings")
+
+julia> scatter(proj[1:100,1], proj[1:100,2];
+               text        = vocab.id2token,
+               markersize  = 0,
+               legend      = false,
+               title       = "t-SNE of Alice-in-Wonderland **word** embeddings: 100")
 
 ```
+
+
 
 ## Functions
 
