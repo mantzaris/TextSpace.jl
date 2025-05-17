@@ -11,7 +11,7 @@ include(joinpath(@__DIR__, "CharacterEmbeddingUtilities", "__init__.jl"))
 using .CharacterEmbeddingUtilities: build_char_pairs
 
 
-export train!, embeddings, save_embeddings, vector  
+export train!, embeddings, save_embeddings, load_embeddings, vector  
 
 
 struct SkipGramModel
@@ -24,6 +24,8 @@ function SkipGramModel(vocab_size::Int, emb_dim::Int)
     w = randn(Float32, emb_dim, vocab_size) .* 0.01f0 #sigma≈0.01
     SkipGramModel(Flux.Embedding(w))
 end
+
+embeddings(m::SkipGramModel) = cpu(m.emb.weight)          # emb_dim times vocab
 
 sigm(x) = 1 ./ (1 .+ exp.(-x))      
 
@@ -47,6 +49,8 @@ function dot_scores(m::SkipGramModel, centers, contexts)
     return vec(sum(z_c .* z_o; dims = 1))
 end
 
+
+#TODO: still needed?
 function cbow_dot_scores(m::SkipGramModel,
     ctxs::Vector{<:AbstractVector{Int}},
     centres::Vector{Int})
@@ -147,8 +151,13 @@ end
 
 
 
-embeddings(m::SkipGramModel) = cpu(m.emb.weight)          # emb_dim times vocab
 
+
+"""
+    save_embeddings
+    
+save a tsv file
+"""
 function save_embeddings(path, m::SkipGramModel, vocab)
     open(path, "w") do io
         for (tok, vec) in zip(vocab.id2token, eachcol(embeddings(m)))
@@ -163,6 +172,38 @@ function vector(m::SkipGramModel, vocab, ch::AbstractString)
     return @view embeddings(m)[:, id]   # alias, no copy
 end
 vector(m::SkipGramModel, vocab, ch::Char) = vector(m, vocab, string(ch)) 
+
+
+
+"""
+    load_embeddings(path) -> (model, vocab)
+
+Read a TSV file produced by [`save_embeddings`](@ref) and reconstruct an
+*inference-only* SkipGram/CBOW model (same embedding matrix) plus its
+`Vocabulary`.  The returned model can be queried with [`vector`](@ref) and
+[`embeddings`](@ref) but **is not meant for further training**.
+"""
+function load_embeddings(path::AbstractString)
+    tokens  = String[]
+    columns = Vector{Float32}[]
+
+    for line in eachline(path)
+        parts = split(line, '\t')
+        push!(tokens, parts[1])
+        push!(columns, Float32.(parse.(Float64, parts[2:end])))
+    end
+
+    E = hcat(columns...)              # (emb_dim × |V|)
+    vocab = V(Dict(tok=>i for (i,tok) in enumerate(tokens)),
+              tokens,
+              Dict{Int,Int}(),        # empty char-class map
+              findfirst(isequal("<unk>"), tokens) )
+
+    m = SkipGramModel(size(E,2), size(E,1))
+    m.emb.weight .= E                 # copy into freshly inited model
+    return m, vocab
+end
+
 
 
 
