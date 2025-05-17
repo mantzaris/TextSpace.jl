@@ -1,4 +1,4 @@
-
+using Random
 
 include("windowify.jl")
 include("skipgram_pairs.jl")
