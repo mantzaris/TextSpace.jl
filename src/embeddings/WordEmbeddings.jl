@@ -4,6 +4,9 @@ using Flux, Random
 using Flux: softplus     
 using Statistics: mean
 using Random: randn
+using LinearAlgebra: dot, norm
+using Zygote: Buffer
+
 
 include(joinpath(@__DIR__, "WordEmbeddingUtilities", "__init__.jl"))
 using .WordEmbeddingUtilities: build_word_pairs
@@ -42,26 +45,26 @@ sg_loss(m, pc, po, nc, no) =
 function cbow_scores(m::SkipGramModel,
                      ctxs::Vector{<:AbstractVector{Int}},
                      ctrs::Vector{Int})
+
     @assert length(ctxs) == length(ctrs)
     n   = length(ctrs)
-    buf = zeros(Float32, n)                 # Zygote-friendly
+    buf = Buffer(Vector{Float32}(undef, n))      # Zygote-friendly scratch
 
-    W = embeddings(m)                       # emb_dim × |V|
+    W = embeddings(m)                            # emb_dim × |V|
 
     @inbounds for k in 1:n
-        μ_ctx = mean(W[:, ctxs[k]]; dims = 2)[:, 1]   # emb_dim
-        buf[k] = dot(μ_ctx, @view W[:, ctrs[k]])
+        μ_ctx = mean(W[:, ctxs[k]]; dims = 2)[:, 1]   # emb_dim vector
+        buf[k] = dot(μ_ctx, @view W[:, ctrs[k]])      # write into Buffer
     end
-    return buf
+    return copy(buf)                              # ordinary tracked Vector
 end
 
 cbow_loss(m, pcx, pctr, ncx, nctr) =
     mean(vcat( softplus.(-cbow_scores(m, pcx, pctr)),
                softplus.( cbow_scores(m, ncx, nctr)) ))
 
-##############################################################################
-# Tiny helper (avoids Allocations in repeat!)
-##############################################################################
+
+               
 @inline function repeat_vec(src::AbstractVector{T}, k::Int) where T
     dest = Vector{T}(undef, length(src)*k)
     @inbounds for t in 0:k-1, i in eachindex(src)
@@ -70,9 +73,8 @@ cbow_loss(m, pcx, pctr, ncx, nctr) =
     return dest
 end
 
-##############################################################################
+
 # Trainer (Skip-Gram + CBOW, negative sampling)
-##############################################################################
 function train!(ids::Vector{Int}, vocab::V;
                 objective::Symbol = :skipgram,
                 emb_dim::Int      = 128,
@@ -126,9 +128,8 @@ function train!(ids::Vector{Int}, vocab::V;
     return model
 end
 
-##############################################################################
-# I/O helpers
-##############################################################################
+
+
 """
     save_embeddings(path, model, vocab)
 

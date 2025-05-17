@@ -25,7 +25,7 @@ normalize_unicode(text::String; form::Symbol = :NFC) =
 
 The helper is UTF-8 safe and leaves non-ASCII scripts untouched.
 """
-function normalize_whitespace(text::String;
+function normalize_whitespace(text::AbstractString;
                               strip_ends::Bool        = true,
                               preserve_newlines::Bool = false,
                               remove_zero_width::Bool = false)

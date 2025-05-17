@@ -239,142 +239,74 @@ function preprocess_for_subword_embeddings(text::String, bpe_tokenizer;
     return sentence_ids
 end
 
+ 
+function preprocess_for_word_embeddings(
+        corpus_input::Union{AbstractString,String};
+        from_file::Bool     = true,
+        min_count::Integer  = 1,
+        vocab_options::Dict = Dict(),
+        clean_options::Dict = Dict())   # ← NEW
 
-"""
-    preprocess_for_word_embeddings(corpus_input::Union{AbstractString, String};
-                                   vocab_options::Dict=Dict())
-                                   -> @NamedTuple{sentence_ids::Vector{Vector{Int}},
-                                                  vocabulary::Vocabulary,
-                                                  cleaned_text::String,
-                                                  tokenized_sentences::Vector{Vector{String}}}
+    #  read corpus 
+    text = (from_file && isfile(corpus_input)) ?
+           read(corpus_input,String) : String(corpus_input)
 
-Simplified pipeline to prepare a text corpus (from string or file path) for word-level embeddings.
-Applies common defaults: Unicode normalization (NFC), lowercasing, punctuation removal,
-whitespace normalization, sentence splitting, word tokenization, and lemmatization.
-Automatically builds the vocabulary from the corpus and returns intermediate results.
-
-Pipeline (Defaults Applied):
-1. Reads corpus if `corpus_input` is a file path.
-2. Cleans text: `clean_text(..., unicode_normalize=true, case_transform=:lower, remove_punctuation=true, remove_symbols=false, remove_emojis=true)`
-3. Splits into sentences: `split_sentences(...)`
-4. Tokenizes sentences: `tokenize(..., strip_punctuation=true, lower=true, lemmatize=true, remove_stopwords=false, stem=false)`
-5. Builds vocabulary: `build_vocabulary(...)` using `vocab_options`.
-6. Converts tokens to IDs: `tokens_to_ids(...)`.
-
-# Arguments
-- `corpus_input::Union{AbstractString, String}`: The input corpus text (as a single string) or the path to a text file containing the corpus.
-
-# Keyword Arguments
-- `vocab_options::Dict`: Options passed directly to `Vocabulary.build_vocabulary` (e.g., `Dict(:min_freq=>5, :max_vocab_size=>30000, :special_tokens=>["<unk>", "<pad>"])`). Ensure `<unk>` is included.
-
-# Returns
-- `NamedTuple`: A named tuple containing:
-    - `sentence_ids::Vector{Vector{Int}}`: The processed corpus as sentence ID sequences.
-    - `vocabulary::Vocabulary`: The `Vocabulary` object built from the corpus.
-    - `cleaned_text::String`: The corpus text after cleaning.
-    - `tokenized_sentences::Vector{Vector{String}}`: The corpus as tokenized sentences (strings).
-
-
-# Examples
-
-```julia
-# Example 1: Basic usage with string input
-text = "Process this text. It has words."
-result = preprocess_for_word_embeddings(text; vocab_options=Dict(:min_freq=>1))
-
-# Expected output structure (IDs depend on generated vocab):
-# (sentence_ids = [[id1, id2, id3], [id4, id5, id6]], 
-#  vocabulary = Vocabulary(...), 
-#  cleaned_text = "process this text it have word", 
-#  tokenized_sentences = [["process", "this", "text"], ["it", "have", "word"]])
-```
-
-```julia
-# Example 2: Usage with file input and custom vocab options
-# Assume "my_corpus.txt" contains: "Line one.\nLine two has more words."
-# write("my_corpus.txt", "Line one.\nLine two has more words.") # Create the file
-
-result = preprocess_for_word_embeddings("my_corpus.txt"; 
-   vocab_options=Dict(:min_freq=>1, :max_vocab_size=>10)
-)
-
-# Expected output structure (IDs depend on generated vocab):
-# (sentence_ids = [[id_l, id_o], [id_l, id_t, id_h, id_m, id_w]], 
-#  vocabulary = Vocabulary(...), # Vocab built with min_freq=1, max_size=10
-#  cleaned_text = "line one line two have more word", 
-#  tokenized_sentences = [["line", "one"], ["line", "two", "have", "more", "word"]])
-
-# rm("my_corpus.txt") # Clean up the file
-```
-"""
-function preprocess_for_word_embeddings(corpus_input::Union{AbstractString, String};
-                                        vocab_options::Dict=Dict())
-
-    # --- Define Default Options --- 
-    default_clean_options = Dict(
-        :unicode_normalize => true,
-        :remove_accents => false, # Usually not default for embeddings
-        :remove_punctuation => true,
-        :remove_symbols => false,
-        :remove_emojis => true,
-        :case_transform => :lower
+    #  cleaning 
+    default_clean_opts = Dict(
+        :unicode_normalize     => true,
+        :do_remove_accents     => false,
+        :do_remove_punctuation => true,
+        :do_remove_symbols     => false,
+        :do_remove_emojis      => true,
+        :case_transform        => :lower,
     )
-    default_tokenize_options = Dict(
-        :strip_punctuation => true, # Applied again just in case clean_text missed edge cases
-        :lower => true,             # Applied again for consistency
-        :remove_stopwords => false, # Often task-specific, default to false
-        :lemmatize => true,         # Apply lemmatization by default as requested
-        :stem => false             # Don't stem if lemmatizing
-    )
-    default_id_options = Dict(:add_new=>false, :update_counts=>true)
+    final_clean = merge(default_clean_opts, clean_options)      # MERGE
+    cleaned_text = clean_text(text; final_clean...)
 
-    #  Read Corpus (if file path)
-    text = if isfile(corpus_input)
-        read(corpus_input, String)
-    else
-        String(corpus_input) # Ensure it's a String
-    end
-
-    # Cleaning (using defaults)
-    cleaned_text = clean_text(text; default_clean_options...)
-
-    # Sentence Splitting (using defaults)
+    #  tokenisation 
     sentences = split_sentences(cleaned_text)
+    default_tok_opts = Dict(
+        :strip_punctuation => true,
+        :lower             => true,
+        :remove_stopwords  => false,
+        :lemmatize         => true,
+        :stem              => false,
+    )
+    tokenised = [tokenize(s; default_tok_opts...) for s in sentences]
 
-    # Tokenize all sentences (using defaults)
-    tokenized_sentences = [tokenize(sentence; default_tokenize_options...) for sentence in sentences]
+    #  vocabulary 
+    merge!(vocab_options, Dict(
+        :min_freq       => min_count,
+        :special_tokens => get(vocab_options, :special_tokens, ["<unk>"]),
+    ))
+    delete!(vocab_options, :min_count)
 
-    #  Build Vocabulary
-    flat_tokens = vcat(tokenized_sentences...)
-    # Ensure <unk> is present for vocabulary building
-    vocab_build_opts = merge(Dict(:special_tokens => ["<unk>"]), vocab_options) # Default <unk> if not provided
-    if !("<unk>" in get(vocab_build_opts, :special_tokens, []))
-         push!(vocab_build_opts[:special_tokens], "<unk>")
+    if !("<unk>" in vocab_options[:special_tokens])
+        push!(vocab_options[:special_tokens], "<unk>")
     end
 
-    vocab_dict = build_vocabulary(flat_tokens; vocab_build_opts...)
+    vdict  = build_vocabulary(vcat(tokenised...); vocab_options...)
+    unk_id = get(vdict["token_to_index"], "<unk>", 0)
 
-    # Create Vocabulary struct instance
-    unk_token = "<unk>"
-    unk_id = get(vocab_dict["token_to_index"], unk_token, 0)
-    if unk_id == 0
-        @warn "\'<unk>\' token not found in generated vocabulary, using ID 0. Ensure \'<unk>\' is in special_tokens."
+    counts = Dict{Int,Int}()
+    if haskey(vdict, "freq")
+        for (tok,cnt) in vdict["freq"]
+            id = get(vdict["token_to_index"], tok, 0)
+            id == 0 && continue
+            counts[id] = cnt
+        end
     end
-    # Initialize counts as empty, they will be populated by tokens_to_ids if update_counts=true
-    vocab = VocabularyModule.Vocabulary(vocab_dict["token_to_index"],
-                                        vocab_dict["index_to_token"],
-                                        Dict{Int,Int}(),
-                                        unk_id)
 
-    # Convert tokens to IDs for each sentence using the built vocab (using defaults)
-    sentence_ids = [Tokenization.tokens_to_ids(tokens, vocab; default_id_options...) for tokens in tokenized_sentences]
+    vocab = Vocabulary(vdict["token_to_index"], vdict["index_to_token"], counts, unk_id)
 
-    return (sentence_ids=sentence_ids,
-            vocabulary=vocab,
-            cleaned_text=cleaned_text,
-            tokenized_sentences=tokenized_sentences)
+    #  ids 
+    sent_ids = [tokens_to_ids(toks, vocab; add_new=false) for toks in tokenised]
+
+    return (word_ids            = sent_ids,
+            vocabulary          = vocab,
+            cleaned_text        = cleaned_text,
+            tokenized_sentences = tokenised)
 end
-
 
 
 

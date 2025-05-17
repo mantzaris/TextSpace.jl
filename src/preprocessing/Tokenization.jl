@@ -100,14 +100,14 @@ function tokenize(text::AbstractString;
 end
 
 
-"""tokenize_batch(docs; kwargs...) → Vector{Vector{String}}"""
+"""tokenize_batch(docs; kwargs...) -> Vector{Vector{String}}"""
 tokenize_batch(docs::Vector{<:AbstractString}; kwargs...) =
     [tokenize(d; kwargs...) for d in docs]
 
 
 
 """
-    tokens_to_ids(tokens, vocab; add_new=false) → Vector{Int}
+    tokens_to_ids(tokens, vocab; add_new=false) -> Vector{Int}
 """
 function tokens_to_ids(tokens::Vector{String},
                        vocab::Vocabulary;
