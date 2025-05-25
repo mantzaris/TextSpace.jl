@@ -35,6 +35,9 @@ include(joinpath(@__DIR__, "embeddings", "CharacterEmbeddings.jl"))
 include(joinpath(@__DIR__, "embeddings", "WordEmbeddings.jl"))
 @reexport using .WordEmbeddings 
 
+include(joinpath(@__DIR__, "embeddings", "SubwordEmbeddings.jl"))
+@reexport using .SubwordEmbeddings 
+
 # package‑wide utilities
 # include("utils/StringExtras.jl")
 end #END MODULE
