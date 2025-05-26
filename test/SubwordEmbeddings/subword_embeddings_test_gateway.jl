@@ -1,8 +1,11 @@
 
-using Serialization
+using Serialization, Random, Statistics, AliasTables
+using Zygote, Flux
+using StatsBase: countmap
+using AliasTables: AliasTable, rand
 
 const SWU = TextSpace.SubwordEmbeddings.SubwordEmbeddingUtilities
-
+const SWE = TextSpace.SubwordEmbeddings
 
 @testset "windowify simple" begin
     toks = 1:5
@@ -196,6 +199,74 @@ end
     vec_unk   = SubwordEmbeddings.vector(m, enc, "NON_EXISTENT_TOKEN_XYZ")
 
     @test length(vec_known) == 12 == length(vec_unk)   # correct size
-    @test vec_known != vec_unk                         # returns *some* vector
+    @test vec_known != vec_unk      # returns *some* unk vector
+end
+
+
+@testset "skip-gram radius-2 window maths" begin
+    txt  = "one two three four five six"
+    ids  = SWU.encode(txt, SWU.load_encoder("gpt2"))
+    pairs = SWU.skipgram_pairs(ids, 2)       # radius = 2
+
+    n = length(ids); r = 2
+    expected = 2n*r - r*(r+1)              
+    @test length(pairs) == expected
+
+    # every pair distance ≤ r
+    for (c, ctx) in pairs
+        @test abs(findfirst(==(c), ids) -
+                  findfirst(==(ctx), ids)) <= r
+    end
+end
+
+
+@testset "cbow radius-3 context length" begin
+    ids = SWU.encode("a b c d e f g h", SWU.load_encoder())
+    tuples = SWU.cbow_pairs(ids, 3)
+    for (ctr, ctx) in tuples
+        @test length(ctx) <= 3*2    # left+right
+        @test !(ctr in ctx)
+    end
+end
+
+
+@testset "1-batch SGNS loss drop" begin
+    corpus = ["good bad good bad", "bad good"]
+    enc    = SWU.load_encoder()
+    ids    = vcat(SWU.encode.(corpus, Ref(enc))...)
+    pairs  = SWU.skipgram_pairs(ids, 2)
+
+    pc, po = first.(pairs), last.(pairs)
+    vocabN = SWU.used_vocab_size(enc)
+    m      = SWE.SkipGramModel(vocabN, 16)
+
+    # tiny negative set just for test
+    freqs  = countmap(ids); toks = collect(keys(freqs))
+    tbl    = AliasTables.AliasTable(Float64.(values(freqs)).^0.75)
+    nc     = repeat(pc, 2)
+    no     = toks[rand(tbl, length(pc)*2)]
+
+    loss_before = SWE.sg_loss(m, pc, po, nc, no)
+    gs = Zygote.gradient(() -> SWE.sg_loss(m, pc, po, nc, no),
+                         Flux.params(m))
+    Flux.Optimise.update!(Flux.Adam(1e-2), Flux.params(m), gs)
+    loss_after  = SWE.sg_loss(m, pc, po, nc, no)
+
+    @test loss_after < loss_before    # one gradient step helped
+end
+
+
+#model -> encoder save -> load round-trip
+@testset "subword model save/load" begin
+    corpus = ["abc def ghi", "def ghi jkl"]
+    m, enc = SWE.train!(corpus; epochs=1, batch=4, emb_dim=8)
+
+    tmp  = mktempdir()
+    file = joinpath(tmp, "subword.bin")
+    SWE.save_embeddings(file, m, enc)
+
+    m2, enc2 = SWE.load_embeddings(file)
+    str = "def"
+    @test SWE.vector(m2, enc2, str) ≈ SWE.vector(m, enc, str)
 end
 

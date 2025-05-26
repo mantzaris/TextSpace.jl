@@ -2,7 +2,7 @@ module SubwordEmbeddings
 
 using Flux, Random, Statistics, LinearAlgebra, Zygote
 using Zygote: Buffer
-using AliasTables: AliasTable, sample       
+using AliasTables: AliasTable, sample, rand      
 using StatsBase: countmap
 import BytePairEncoding as BPE
 
@@ -15,7 +15,7 @@ export train!, SkipGramModel, embeddings,
 
 
 struct SkipGramModel
-    emb::Flux.Embedding     # (d x |V|)
+    emb::Flux.Embedding     # (d by |V|)
 end
 Flux.@layer SkipGramModel
 embeddings(m::SkipGramModel) = cpu(m.emb.weight)
