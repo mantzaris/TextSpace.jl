@@ -137,3 +137,65 @@ end
     @test SWU.decode(SWU.encode(str, enc2), enc2) == str
     @test SWU.used_vocab_size(enc2) == SWU.used_vocab_size(enc)
 end
+
+
+@testset "subword sgns smoke" begin
+    corpus = ["hello world", "hello Julia"]
+    m, enc = SubwordEmbeddings.train!(corpus; epochs=1, batch=4, emb_dim=32)
+    v = SubwordEmbeddings.vector(m, enc, "hello")
+    @test length(v) == 32
+end
+
+
+#CBOW 1-epoch smoke-test
+@testset "subword CBOW smoke" begin
+    corpus = ["flux is amazing", "hello flux"]
+    m, enc = SubwordEmbeddings.train!(corpus;
+                                      objective   = :cbow,
+                                      epochs      = 1,
+                                      batch       = 4,
+                                      emb_dim     = 32,
+                                      k_neg       = 2)
+    # vectors have expected length
+    v = SubwordEmbeddings.vector(m, enc, "flux")
+    @test length(v) == 32
+end
+
+
+#Embedding matrix vs vocab size
+@testset "embedding rows = used vocab size" begin
+    enc = SWU.load_encoder("gpt2")
+    vN  = SWU.used_vocab_size(enc)
+    m   = SubwordEmbeddings.SkipGramModel(vN, 16) #tiny dim
+
+    @test size(SubwordEmbeddings.embeddings(m), 2) == vN
+end
+
+
+#save_embeddings / load_embeddings round-trip
+@testset "embedding save/load round-trip" begin
+    corpus = ["tiny corpus"]
+    m, enc  = SubwordEmbeddings.train!(corpus; epochs=1, batch=2, emb_dim=8)
+
+    tmp  = mktempdir()
+    file = joinpath(tmp, "sub_emb.bin")
+    SubwordEmbeddings.save_embeddings(file, m, enc)
+
+    m2, enc2 = SubwordEmbeddings.load_embeddings(file)
+    tok = "tiny"
+    @test SubwordEmbeddings.vector(m2, enc2, tok) ≈
+          SubwordEmbeddings.vector(m,  enc,  tok)
+end
+
+
+@testset "vector() unknown-token still encodes" begin
+    enc = SWU.load_encoder()
+    m   = SubwordEmbeddings.SkipGramModel(SWU.used_vocab_size(enc), 12)
+
+    vec_known = SubwordEmbeddings.vector(m, enc, "hello")
+    vec_unk   = SubwordEmbeddings.vector(m, enc, "NON_EXISTENT_TOKEN_XYZ")
+
+    @test length(vec_known) == 12 == length(vec_unk)   # correct size
+    @test vec_known != vec_unk                         # returns *some* vector
+end
+
