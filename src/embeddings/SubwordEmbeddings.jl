@@ -38,8 +38,8 @@ function cbow_scores(m::SkipGramModel,
     buf = Buffer(Vector{Float32}(undef, n))
     W   = embeddings(m)
     @inbounds for k in 1:n
-        μ = mean(@view W[:, ctxs[k]]; dims = 2)[:, 1]
-        buf[k] = dot(μ, @view W[:, ctrs[k]])
+        mu = mean(@view W[:, ctxs[k]]; dims = 2)[:, 1]
+        buf[k] = dot(mu, @view W[:, ctrs[k]])
     end
     return copy(buf)
 end
