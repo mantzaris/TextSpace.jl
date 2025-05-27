@@ -1,7 +1,7 @@
 module Preprocessing
 
 include(joinpath(@__DIR__, "CleanText.jl"))
-include(joinpath(@__DIR__, "Vocabulary.jl"))          #  -> Vocabulary, convert_tokens_to_ids, …
+include(joinpath(@__DIR__, "Vocabulary.jl"))          #  -> Vocabulary, convert_tokens_to_ids, 
 include(joinpath(@__DIR__, "TextNormalization.jl"))   #  -> clean_text / normalize_whitespace
 include(joinpath(@__DIR__, "Stemming.jl"))
 include(joinpath(@__DIR__, "Lemmatization.jl"))
@@ -9,8 +9,8 @@ include(joinpath(@__DIR__, "Tokenization.jl"))        #  -> tokenize
 include(joinpath(@__DIR__, "CharProcessing.jl"))      #  -> tokenize_char
 include(joinpath(@__DIR__, "SentenceProcessing.jl"))  #  -> split_sentences
 include(joinpath(@__DIR__, "ParagraphProcessing.jl")) #  -> split_paragraphs, paragraph_windows
-include(joinpath(@__DIR__, "SubwordTokenization.jl")) #  -> train_bpe, load_bpe, encode, …
-include(joinpath(@__DIR__, "TextVectorization.jl"))   #  -> pad_sequences, tfidf_matrix, …
+include(joinpath(@__DIR__, "SubwordTokenization.jl")) #  -> train_bpe, load_bpe, encode, 
+include(joinpath(@__DIR__, "TextVectorization.jl"))   #  -> pad_sequences, tfidf_matrix, 
 include(joinpath(@__DIR__, "DocumentProcessing.jl"))  #  -> process_document, document_batch_iter
 
 
@@ -21,6 +21,7 @@ export preprocess_for_char_embeddings,
        preprocess_for_subword_embeddings,
        preprocess_for_document_embeddings,
        preprocess_for_word_embeddings
+
 
 # --- Pipeline Function Implementations ---
 
@@ -210,16 +211,16 @@ text = "Subword example. Another sentence."
 # result = preprocess_for_subword_embeddings(text, bpe)
 
 # Expected output structure (IDs depend heavily on the BPE model):
-# [[id1, id2, id3], [id4, id5]] 
+# [[id1, id2, id3], [id4, id5]]
 
 # Example 2: Keep punctuation during cleaning for BPE
 text = "Keep punctuation? Yes!"
-# result = preprocess_for_subword_embeddings(text, bpe; 
+# result = preprocess_for_subword_embeddings(text, bpe;
 #     clean_options=Dict(:remove_punctuation=>false, :case_transform=>:none)
 # )
 
 # Expected output structure (IDs depend heavily on the BPE model):
-# [[id_k, id_punc, id_q], [id_y, id_exc]] 
+# [[id_k, id_punc, id_q], [id_y, id_exc]]
 # Note: Actual usage requires a valid `bpe` object.
 ```
 """
@@ -238,6 +239,63 @@ function preprocess_for_subword_embeddings(text::String, bpe_tokenizer;
 
     return sentence_ids
 end
+
+"""
+    preprocess_for_subword_embeddings(text;
+                                      bpe_vocab_size   = 16_000,
+                                      bpe_merges       = 200_000,
+                                      special_tokens   = ("<pad>","<unk>","<cls>","<sep>","<mask>"),
+                                      clean_options    = Dict(),
+                                      sentence_options = Dict(),
+                                      encode_options   = Dict())
+High-level helper that
+
+1. **learns (or reuses) a BPE encoder** on the supplied *text*,
+2. cleans & sentence-splits the text just like the other preprocessors,
+3. returns `Vector{Vector{Int}}` ready for `SubwordEmbeddings.train!`.
+
+The learned encoder is returned too so you can reuse it on other text.
+
+```julia
+ids, enc = Preprocessing.preprocess_for_subword_embeddings(long_txt;
+                                                           bpe_vocab_size = 8_000)
+model, _  = SubwordEmbeddings.train!(ids; enc = enc)
+
+"""
+function preprocess_for_subword_embeddings(text::AbstractString;
+        # BPE hyper-params
+        bpe_vocab_size::Int = 16_000,
+        bpe_merges::Int     = 200_000,
+        special_tokens      = DEFAULT_SPECIAL_TOKENS,
+
+        # cleaning / splitting / encoding knobs
+        clean_options    ::Dict = Dict(),
+        sentence_options ::Dict = Dict(),
+        encode_options   ::Dict = Dict())
+
+    # 1️⃣ write the raw text to a temp file -------------------------------
+    txtfile = tempname()*".txt"
+    write(txtfile, text)
+
+    # 2️⃣ learn a tiny BPE on that file -----------------------------------
+    model_path = tempname()*".bpe"
+    train_bpe([txtfile];
+              vocab_size     = bpe_vocab_size,
+              num_merges     = bpe_merges,
+              special_tokens = special_tokens,
+              model_path     = model_path)
+
+    enc = SubwordTokenization.load_bpe(model_path)
+
+    # 3️⃣ clean, split, encode -------------------------------------------
+    cleaned    = clean_text(text; clean_options...)
+    sentences  = split_sentences(cleaned; sentence_options...)
+    ids        = [SubwordTokenization.encode(enc, s; encode_options...)
+                  for s in sentences]
+
+    return ids, enc
+end
+
 
  
 function preprocess_for_word_embeddings(

@@ -280,6 +280,139 @@ julia> scatter(proj[1:100,1], proj[1:100,2];
 
 
 
+
+# Sub-word (BPE) Embeddings Example
+
+
+```julia
+julia> using Downloads, TextSpace, Random, LinearAlgebra, Statistics
+
+julia> const SWE = TextSpace.SubwordEmbeddings   
+TextSpace.SubwordEmbeddings
+
+#small corpus for using Pretrained BPE
+julia> alice_url = "https://www.gutenberg.org/files/11/11-0.txt"
+"https://www.gutenberg.org/files/11/11-0.txt"
+
+julia> tmpfile   = joinpath(mktempdir(), "alice_sub.txt")
+"/tmp/jl_Kf8vXd/alice_sub.txt"
+
+julia> Downloads.download(alice_url, tmpfile)
+"/tmp/jl_Kf8vXd/alice_sub.txt"
+
+julia> lines = String.(split(read(tmpfile, String), '\n'; keepempty = false))
+2496-element Vector{String}:
+ "*** START OF THE PROJECT GUTENBERG EBOOK 11 ***"
+...
+
+julia> model, enc = SWE.train!(lines; # now Vector{String}
+                               encoder_name = "cl100k_base",
+                               epochs       = 10, #really short training
+                               batch        = 2048,
+                               emb_dim      = 64,
+                               radius       = 5,
+                               rng          = MersenneTwister(123))
+
+julia> E = SWE.embeddings(model)      # 64 by |V| Float32 matrix
+
+julia> cosine(a,b) = dot(a,b) / (norm(a)*norm(b) + eps()) #helper function
+
+julia> function wordvec(word) #helper function
+           ids = enc.encode(word)                 # BytePairEncoding API
+           mean(E[:, ids]; dims = 2) |> vec
+       end
+
+julia> function nearest(word; k = 5) #helper function 
+    v = wordvec(word)
+    sims = [(tok, cosine(v, E[:, id])) for (tok,id) in SWE.each_token(enc)]
+    sort!(sims; by = last, rev = true)[1:k]
+end
+
+julia> nearest("alice")
+5-element Vector{Tuple{String, Float64}}:
+ ("alice", 0.9999999999999575)
+ (" hade", 0.5131048298879446)
+ ("expiration", 0.48866187822890006)
+ (" problematic", 0.48084224146381127)
+ ("\trc", 0.4801181579918874)
+
+julia> nearest("rabbit")
+5-element Vector{Tuple{String, Float64}}:
+ ("rabbit", 0.9999999170183584)
+ ("('-',", 0.5016094944372554)
+ (".properties", 0.47971542221121205)
+ (" ACT", 0.469640182630054)
+ (".userData", 0.4604995969573127)
+
+julia> nearest("cat")
+5-element Vector{Tuple{String, Float64}}:
+ ("cat", 0.999999999999999)
+ (" evening", 0.9248988543803454)
+ ("William", 0.9212584156353408)
+ ("ars", 0.9024920623025695)
+ (" Who", 0.8968998649983356)
+
+#when training on a small corpus many of the words are unseen
+julia> seen_ids = unique(vcat(enc.encode.(lines)...))   # IDs that appear
+3913-element Vector{Int64}:
+
+julia> function nearest_word_seen(word; k=5)
+           v = wordvec(word)
+           sims = [(enc.vocab.list[id], cosine(v, E[:, id]))
+                   for id in seen_ids if is_word(enc.vocab.list[id])]
+           sort!(sims; by = last, rev = true)[1:k]
+       end
+
+julia> nearest_word_seen("alice")
+5-element Vector{Tuple{String, Float64}}:
+ ("thing", 0.32003743130824647)
+ ("the", 0.3015098276822004)
+ ("an", 0.28568369350261397)
+ ("common", 0.25842654965108713)
+ ("als", 0.25803399997313126)
+
+julia> nearest_word_seen("rabbit")
+5-element Vector{Tuple{String, Float64}}:
+ ("What", 0.23954452836137805)
+ ("Why", 0.22050971152471946)
+ ("or", 0.19594570781380372)
+ ("Let", 0.18518634659958685)
+ ("think", 0.18162724520582288)
+
+julia> nearest_word_seen("cat")
+5-element Vector{Tuple{String, Float64}}:
+ ("cat", 0.9999999172449788)
+ ("yster", 0.807033835912888)
+ ("est", 0.7975417191124465)
+ ("ro", 0.7965722728462085)
+ ("adder", 0.7905969983375803)
+
+julia> sentence = "The quick brown fox jumps over the lazy dog."
+"The quick brown fox jumps over the lazy dog."
+
+julia> svec = mean(E[:, enc.encode(sentence)]; dims = 2) |> vec
+64-element Vector{Float32}:
+
+
+
+
+
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
 ## Functions
 
 ```@autodocs
