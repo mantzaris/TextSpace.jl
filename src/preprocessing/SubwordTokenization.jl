@@ -88,4 +88,38 @@ end
 
 vocabulary(tok) = tok.vocab
 
-special_id(tok, sym::AbstractString) = TextEncodeBase.lookup_index(tok.vocab, sym)
+# special_id(tok, sym::AbstractString) = TextEncodeBase.lookup_index(tok.vocab, sym)
+"""
+    special_id(tok, sym) → Int
+
+Return the integer id of *sym* (e.g. "<pad>") inside `tok.vocab`.
+Works for the `Vocab` object shipped with BytePairEncoding ≥ 0.5, which
+does **not** support `tok.vocab["<pad>"]`.
+"""
+function special_id(tok, sym::AbstractString)
+    idx = findfirst(==(sym), tok.vocab.list)
+    idx === nothing && error("special token $sym not in vocab")
+    return idx          # 1-based already – no +1 shift needed
+end
+
+
+"""
+    encode_batch(tok, docs; pad_id=tok.vocab["<pad>"], add_special_tokens=false)
+
+Vectorised version that returns a **column-major matrix**
+(max_len, batch), padded with pad_id.
+"""
+function encode_batch(tok,
+                      docs::Vector{<:AbstractString};
+                      pad_id::Integer = special_id(tok, "<pad>"),
+                      add_special_tokens::Bool = false)
+
+    seqs   = [encode(tok, d; add_special_tokens) for d in docs]
+    maxlen = maximum(length.(seqs))
+    mat    = fill(pad_id, maxlen, length(seqs))
+
+    for (i, s) in enumerate(seqs)
+        mat[1:length(s), i] .= s
+    end
+    return mat
+end

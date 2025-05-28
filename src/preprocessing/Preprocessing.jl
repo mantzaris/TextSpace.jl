@@ -257,7 +257,7 @@ High-level helper that
 The learned encoder is returned too so you can reuse it on other text.
 
 ```julia
-ids, enc = Preprocessing.preprocess_for_subword_embeddings(long_txt;
+sentences, enc = Preprocessing.preprocess_for_subword_embeddings(long_txt;
                                                            bpe_vocab_size = 8_000)
 model, _  = SubwordEmbeddings.train!(ids; enc = enc)
 
@@ -273,11 +273,9 @@ function preprocess_for_subword_embeddings(text::AbstractString;
         sentence_options ::Dict = Dict(),
         encode_options   ::Dict = Dict())
 
-    # 1️⃣ write the raw text to a temp file -------------------------------
     txtfile = tempname()*".txt"
     write(txtfile, text)
 
-    # 2️⃣ learn a tiny BPE on that file -----------------------------------
     model_path = tempname()*".bpe"
     train_bpe([txtfile];
               vocab_size     = bpe_vocab_size,
@@ -285,15 +283,12 @@ function preprocess_for_subword_embeddings(text::AbstractString;
               special_tokens = special_tokens,
               model_path     = model_path)
 
-    enc = SubwordTokenization.load_bpe(model_path)
+    enc = load_bpe(model_path)
 
-    # 3️⃣ clean, split, encode -------------------------------------------
     cleaned    = clean_text(text; clean_options...)
     sentences  = split_sentences(cleaned; sentence_options...)
-    ids        = [SubwordTokenization.encode(enc, s; encode_options...)
-                  for s in sentences]
 
-    return ids, enc
+    return sentences, enc
 end
 
 

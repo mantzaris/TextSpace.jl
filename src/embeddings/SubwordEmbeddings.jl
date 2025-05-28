@@ -133,6 +133,62 @@ function train!(corpus::Vector{String};
 end
 
 
+function train_custom!(corpus::Vector{String};
+                       enc::BPE.BPEEncoder,
+                       objective::Symbol = :skipgram,
+                       emb_dim::Int     = 256,
+                       radius::Int      = 5,
+                       epochs::Int      = 5,
+                       batch::Int       = 2_048,
+                       k_neg::Int       = 5,
+                       lr               = 1e-3,
+                       rng              = Random.GLOBAL_RNG)
+
+    @assert objective ∈ (:skipgram, :cbow)
+
+    raw_ids = vcat(SWU.encode.(corpus, Ref(enc))...) .+ 1    
+    pairs   = objective === :skipgram ?
+              SWU.skipgram_pairs(raw_ids, radius) :
+              SWU.cbow_pairs(raw_ids,  radius)
+
+    vocabN  = maximum(raw_ids)   # matrix needs up-to-max columns
+    model   = SkipGramModel(vocabN, emb_dim)
+    opt     = Flux.Adam(lr)
+
+    freqs   = countmap(raw_ids)
+    tok_ids = collect(keys(freqs))   # already base-1
+    wts     = Float64.(values(freqs)).^0.75
+    negtab  = AliasTable(wts)
+
+    posC, posO = objective === :skipgram ? (first.(pairs), last.(pairs)) : (last.(pairs), first.(pairs))
+    N = length(posC)
+
+    for epoch in 1:epochs
+        for i in 1:batch:N
+            j  = min(i+batch-1, N)
+
+            if objective === :skipgram
+                pc, po = posC[i:j], posO[i:j]
+                nc     = repeat_vec(pc, k_neg)
+                no     = tok_ids[rand(rng, negtab, length(po)*k_neg)]
+                gs = gradient(() -> sg_loss(model, pc, po, nc, no),
+                              Flux.params(model))
+            else
+                ctx_pos = posC[i:j]; ctr_pos = posO[i:j]
+                ctx_neg = vcat(Iterators.repeated(ctx_pos, k_neg)...)
+                ctr_neg = tok_ids[rand(rng, negtab, length(ctr_pos)*k_neg)]
+                gs = gradient(() -> cbow_loss(model, ctx_pos, ctr_pos,
+                                              ctx_neg,  ctr_neg),
+                              Flux.params(model))
+            end
+            Flux.Optimise.update!(opt, Flux.params(model), gs)
+        end
+        @info "epoch $epoch finished"
+    end
+    return model, enc
+end
+
+
 
 # persistence
 using Serialization

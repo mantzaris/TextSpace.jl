@@ -19,6 +19,16 @@ used_vocab_size(enc::BPE.BPEEncoder) = length(enc.vocab.list)
 
 
 """
+    full_vocab_size(enc::BPE.BPEEncoder) → Int
+
+Total length of the tiktoken vocabulary **including** the internal `#undef`
+gaps.  
+(Use the old `used_vocab_size(::BPEEncoder)` if you need the “defined-slot
+count”.)
+"""
+full_vocab_size(enc::BPE.BPEEncoder) = length(enc.vocab.list)
+
+"""
     save_encoder(path, enc)
 
 Serialize the `BPEEncoder` to a binary file.
