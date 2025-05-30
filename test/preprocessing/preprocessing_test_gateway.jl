@@ -41,10 +41,10 @@ include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "ParagraphProcess
 # include("preprocessing_textnormalization_tests.jl")
 
 #test the vocabulary
-include("preprocessing_vocaculary_tests.jl")
+# include("preprocessing_vocaculary_tests.jl")
 
 # #test the text vectorization
 # include("preprocessing_textvectorization_tests.jl")
 
 # #test the text tokenization
-# include("preprocessing_tokenization_tests.jl")
+include("preprocessing_tokenization_tests.jl")
