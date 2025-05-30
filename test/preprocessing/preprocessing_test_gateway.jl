@@ -29,7 +29,7 @@ include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "ParagraphProcess
 # include("preprocessing_subwordtokenization_tests.jl")
 
 # #test clean text
-# include("preprocessing_cleantext_tests.jl")
+include("preprocessing_cleantext_tests.jl")
 
 # #test stemming
 # include("preprocessing_lemmatization_tests.jl")
@@ -38,7 +38,7 @@ include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "ParagraphProcess
 # include("preprocessing_stemming_tests.jl")
 
 # #test the textnormalization
-include("preprocessing_textnormalization_tests.jl")
+# include("preprocessing_textnormalization_tests.jl")
 
 #test the vocabulary
 # include("preprocessing_vocaculary_tests.jl")
