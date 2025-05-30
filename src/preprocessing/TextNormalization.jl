@@ -1,4 +1,4 @@
-# (Optional) Additional text normalization (e.g., accent stripping, stemming, lemmatization)
+#(future) text normalization (add: accent stripping, stemming, lemmatization)
 
 """
     normalize_unicode(text; form = :NFC) -> String
