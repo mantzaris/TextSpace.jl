@@ -10,7 +10,7 @@ include(joinpath(@__DIR__, "..", "src", "preprocessing", "Vocabulary.jl"))
 include("SubwordEmbeddings/subword_embeddings_test_gateway.jl")
 # include("WordEmbeddings/word_embeddings_test_gateway.jl")
 # include("CharacterEmbeddings/character_embeddings_test_gateway.jl")
-# include("preprocessing/preprocessing_test_gateway.jl")
+include("preprocessing/preprocessing_test_gateway.jl")
 
 
 @testset "basic tests" begin

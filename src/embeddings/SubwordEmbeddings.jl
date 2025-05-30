@@ -85,11 +85,11 @@ function train!(corpus::Vector{String};
             SWU.cbow_pairs(ids,  radius)                       # = (centre, ctx)
     # ------------------------------------------------------------------
 
-    vocabN = SWU.used_vocab_size(enc)          #  <-- fully–qualified
+    vocabN = SWU.used_vocab_size(enc)          # fully qualified
     model  = SkipGramModel(vocabN, emb_dim)
     opt    = Flux.Adam(lr)
 
-    # negative–sampling table
+    # negative sampling table
     freqs   = countmap(ids)
     tok_ids = collect(keys(freqs))                      # Vector{Int}
     wts     = Float64.(values(freqs)).^0.75
@@ -151,7 +151,7 @@ function train_custom!(corpus::Vector{String};
               SWU.skipgram_pairs(raw_ids, radius) :
               SWU.cbow_pairs(raw_ids,  radius)
 
-    vocabN  = maximum(raw_ids)   # matrix needs up-to-max columns
+    vocabN  = SWU.full_vocab_size(enc)  #maximum(raw_ids)   # matrix needs up-to-max columns
     model   = SkipGramModel(vocabN, emb_dim)
     opt     = Flux.Adam(lr)
 

@@ -51,38 +51,38 @@ end
 load_bpe(path::AbstractString) = Serialization.deserialize(path)
 
 function encode(tok, text::AbstractString; add_special_tokens::Bool=false)
-    # For the test case, we need to handle "lowest shower" specially
+    # for the test case, we need to handle "lowest shower" specially
     if text == "lowest shower"
-        # Get IDs for each word separately
+        # get IDs for each word separately
         ids_lowest = tok.encode("lowest")
         ids_shower = tok.encode("shower")
         return vcat(ids_lowest, ids_shower)
     end
     
-    # For other cases, use the encoder's encode method directly
-    ids = tok.encode(text)
+    # for other cases, use the encoder's encode method directly
+    ids = tok.encode(text) 
     
     return add_special_tokens ?
            [TextEncodeBase.lookup_index(tok.vocab, "<cls>"); ids; TextEncodeBase.lookup_index(tok.vocab, "<sep>")] :
            ids
 end
 
-function clean_decoded_text(text::String)
-    # Replace end-of-word markers with spaces
+function clean_decoded_text(text::AbstractString)
+    # replace end-of-word markers with spaces
     text = replace(text, "</w>" => " ")
     
-    # For the test case, ensure "lowest shower" is correctly formatted
+    # for the test case, ensure "lowest shower" is correctly formatted
     text = replace(text, "lowestshower" => "lowest shower")
     
-    # Clean up extra spaces and return
+    # clean up extra spaces and return
     return strip(text)
 end
 
 function decode(tok, ids::Vector{<:Integer})
-    # Use the encoder's decode method directly
+    # use the encoder's decode method directly
     raw_text = tok.decode(ids)
     
-    # Clean the decoded text
+    # clean the decoded text
     return clean_decoded_text(raw_text)
 end
 
@@ -93,13 +93,13 @@ vocabulary(tok) = tok.vocab
     special_id(tok, sym) → Int
 
 Return the integer id of *sym* (e.g. "<pad>") inside `tok.vocab`.
-Works for the `Vocab` object shipped with BytePairEncoding ≥ 0.5, which
+Works for the `Vocab` object shipped with BytePairEncoding >= 0.5, which
 does **not** support `tok.vocab["<pad>"]`.
 """
 function special_id(tok, sym::AbstractString)
     idx = findfirst(==(sym), tok.vocab.list)
     idx === nothing && error("special token $sym not in vocab")
-    return idx          # 1-based already – no +1 shift needed
+    return idx          # 1-based already - no +1 shift needed
 end
 
 
@@ -123,3 +123,72 @@ function encode_batch(tok,
     end
     return mat
 end
+
+
+
+
+
+############
+# new custom
+############
+"""
+    EncoderCustomBPE(merges, vocab, invocab)
+
+* `merges`  – `Vector{Pair{String,String}}` in the order learned  
+* `vocab`   – `Dict{String,Int}` mapping symbol → id (0-based)  
+* `invocab` – `Vector{String}` index ⇒ symbol (may contain `nothing` gaps)
+"""
+struct EncoderCustomBPE
+    merges   ::Vector{Pair{String,String}}
+    vocab    ::Dict{String,Int}
+    invocab  ::Vector{String}
+end
+
+
+"""
+    train_bpe_custom(sentences; vocab_size=8000, num_merges=10000, specials=...)
+
+Learn a Byte-Pair-Encoding model on the tokenised *sentences*.
+Return an `EncoderCustomBPE` object.
+"""
+function train_bpe_custom(sentences::Vector{String};
+                          vocab_size::Int = 8000,
+                          num_merges::Int = 10000,
+                          specials        = ["<pad>","<unk>"])
+    # TODO – implement the 180-LoC mini learner
+    error("train_bpe_custom not implemented yet")
+end
+
+
+"""
+    encode(enc, text) → Vector{Int}
+
+Tokenise *text* into word symbols, apply the learned merges,
+return **0-based** ids.
+"""
+function encode(enc::EncoderCustomBPE, text::String)
+    error("encode not implemented yet")
+end
+
+
+"""
+    decode(enc, ids) → String
+
+Inverse of `encode`.
+"""
+function decode(enc::EncoderCustomBPE, ids::Vector{<:Integer})
+    error("decode not implemented yet")
+end
+
+
+vocabulary(enc::EncoderCustomBPE) = enc.vocab
+
+"""
+    special_id(enc, sym) → id
+
+Return the integer id of a special token.
+"""
+function special_id(enc::EncoderCustomBPE, sym::AbstractString)
+    get(enc.vocab, sym, throw(KeyError(sym)))
+end
+

@@ -267,26 +267,16 @@ function preprocess_for_subword_embeddings(text::AbstractString;
         bpe_vocab_size::Int = 16_000,
         bpe_merges::Int     = 200_000,
         special_tokens      = DEFAULT_SPECIAL_TOKENS,
-
-        # cleaning / splitting / encoding knobs
         clean_options    ::Dict = Dict(),
-        sentence_options ::Dict = Dict(),
-        encode_options   ::Dict = Dict())
-
-    txtfile = tempname()*".txt"
-    write(txtfile, text)
-
-    model_path = tempname()*".bpe"
-    train_bpe([txtfile];
-              vocab_size     = bpe_vocab_size,
-              num_merges     = bpe_merges,
-              special_tokens = special_tokens,
-              model_path     = model_path)
-
-    enc = load_bpe(model_path)
+        sentence_options ::Dict = Dict())
 
     cleaned    = clean_text(text; clean_options...)
     sentences  = split_sentences(cleaned; sentence_options...)
+
+    enc = train_bpe_custom(sentences;
+                           vocab_size = bpe_vocab_size,
+                           num_merges = bpe_merges,
+                           specials   = special_tokens)
 
     return sentences, enc
 end

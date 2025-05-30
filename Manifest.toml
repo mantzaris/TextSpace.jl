@@ -113,6 +113,8 @@ version = "0.1.9"
 [[deps.BytePairEncoding]]
 deps = ["Artifacts", "Base64", "DataStructures", "DoubleArrayTries", "LRUCache", "LazyArtifacts", "StructWalk", "TextEncodeBase", "Unicode"]
 git-tree-sha1 = "b8d2edaf190d01d6a1c30b80d1db2d866fbe7371"
+repo-rev = "master"
+repo-url = "https://github.com/chengchingwen/BytePairEncoding.jl.git"
 uuid = "a4280ba5-8788-555a-8ca8-4a8c3d966a71"
 version = "0.5.2"
 
