@@ -26,7 +26,10 @@ include("preprocessing_char_tests.jl")
 # include("preprocessing_sentence_tests.jl")
 
 # #test subword tokenization
-include("preprocessing_subwordprocessing_tests.jl")
+include("preprocessing_subword_tests.jl")
+
+#test subword pipeline preprocessing
+include("preprocessing_subword_pipeline_tests.jl")
 
 # #test clean text
 # include("preprocessing_cleantext_tests.jl")

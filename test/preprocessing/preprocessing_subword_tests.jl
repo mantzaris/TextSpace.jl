@@ -563,3 +563,22 @@ end
     #empty corpus still returns empty set
     @test isempty(extract_all_symbols(Vector{Vector{Vector{String}}}()))
 end
+
+
+@testset "build_vocabulary_wordpiece - specials exceed cap" begin
+    specials = ["<pad>", "<unk>", "<cls>"]
+    cap      = 2           # smaller than #specials
+
+    vdict = build_vocabulary_wordpiece(["a b c"];
+                                       vocab_size     = cap,
+                                       special_tokens = specials)
+
+    toks = vdict["index_to_token"]
+
+    # Policy: ALL specials + [UNK] are kept, even if > cap
+    @test toks[1:4] == ["<pad>", "<unk>", "<cls>", "[UNK]"]
+    @test length(toks) >= 4                       # cap can be exceeded
+
+    # Internal maps still consistent
+    @test length(vdict["token_to_index"]) == length(toks)
+end
