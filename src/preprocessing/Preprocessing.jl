@@ -27,77 +27,103 @@ export preprocess_for_char_embeddings,
 
 
 """
-    preprocess_for_char_embeddings(corpus_input::Union{AbstractString, String};
-                                         from_file::Bool = true,
-                                         vocab::Union{Vocabulary, Nothing}=nothing,
-                                         vocab_options::Dict=Dict(),
-                                         clean_options::Dict=Dict(),
-                                         char_options::Dict=Dict(),
-                                         id_options::Dict=Dict())
-                                         -> @NamedTuple{char_ids::Vector{Int},
-                                                        vocabulary::Vocabulary,
-                                                        chars::Vector{String},
-                                                        cleaned_text::String}
+    preprocess_for_char_embeddings(corpus_input::AbstractString;
+                                   from_file::Bool                 = true,
+                                   vocab::Union{Vocabulary,Nothing}= nothing,
+                                   vocab_options::Dict             = Dict(),
+                                   clean_options::Dict             = Dict(),
+                                   char_options::Dict              = Dict(),
+                                   id_options::Dict                = Dict())
+        → NamedTuple{char_ids::Vector{Int},
+                     vocabulary::Vocabulary,
+                     chars::Vector{String},
+                     cleaned_text::String}
 
-Prepares text (from string or file path) for character-level embeddings.
-Applies minimal default cleaning (Unicode normalization). Tokenizes into characters (graphemes).
-Optionally builds a character vocabulary if one is not provided.
+High-level helper that **cleans, tokenises, builds/uses a character
+vocabulary and converts the text to integer IDs** - everything you need
+before feeding a character-level embedding model.
 
-Pipeline (Defaults Applied):
-1. Reads corpus if `corpus_input` is a file path.
-2. Cleans text: `clean_text(..., unicode_normalize=true, case_transform=:none, ...)` using `clean_options`.
-3. Tokenizes into characters: `tokenize_char(...)` using `char_options`.
-4. Builds vocabulary (if `vocab=nothing`): `build_vocabulary(...)` from characters using `vocab_options`.
-5. Converts characters to IDs: `chars_to_ids(...)` using `id_options`.
 
-# Arguments
-- `corpus_input::Union{AbstractString, String}`: The input text (as a single string) or the path to a text file.
+DEFAULT PIPELINE
+1. **Read input**
 
-# Keyword Arguments
-- `vocab::Union{Vocabulary, Nothing}`: A pre-built character `Vocabulary`. If `nothing` (default), a vocabulary is built automatically from the input text characters.
-- `vocab_options::Dict`: Options passed to `Vocabulary.build_vocabulary` if `vocab=nothing`. Defaults typically include `min_freq=1` and `special_tokens=["<unk>"]`.
-- `clean_options::Dict`: Options passed to `CleanText.clean_text`. Defaults focus on minimal cleaning suitable for char models (e.g., `unicode_normalize=true`, `case_transform=:none`).
-- `char_options::Dict`: Options passed to `CharProcessing.tokenize_char` (e.g., `Dict(:keep_space=>true)`).
-- `id_options::Dict`: Options passed to `CharProcessing.chars_to_ids` (e.g., `Dict(:add_new=>false)`).
+   *If `from_file=true`* and `corpus_input` is a valid path, the file is
+   loaded; otherwise the argument is treated as a raw string.
 
-# Returns
-- `NamedTuple`: A named tuple containing:
-    - `char_ids::Vector{Int}`: The flat list of character IDs.
-    - `vocabulary::Vocabulary`: The vocabulary used (provided or built).
-    - `chars::Vector{String}`: The list of characters (graphemes) after cleaning.
-    - `cleaned_text::String`: The cleaned text before character tokenization.
+2. **Clean** - `clean_text` with defaults
 
-# Examples
+| flag (kw in `clean_options`) | default | effect |
+|------------------------------|---------|--------|
+| `:unicode_normalize`         | `true`  | NFC canonical form. |
+| `:do_remove_accents`         | `false` | Strip combining marks. |
+| `:do_remove_punctuation`     | `false` | Remove Unicode punctuation. |
+| `:do_remove_symbols`         | `false` | Remove currency, math, emoji. |
+| `:do_remove_emojis`          | `false` | Remove all emoji blocks. |
+| `:case_transform`            | `:none` | `:lower | :upper | :none`. |
+| `:collapse_whitespace`      | `false` | Collapse runs of blanks to one<br>space **after** cleaning. |
+
+-> `collapse_whitespace` is *intercepted* by this helper and is **not**
+forwarded to `clean_text`.
+
+3. **Tokenise to graphemes** - `tokenize_char`
+
+   `char_options` are forwarded verbatim.  Default
+   `Dict(:keep_space => true)` keeps ordinary spaces; pass
+   `Dict(:keep_space=>false)` if you want them dropped.
+
+4. **Vocabulary**
+
+   *When `vocab === nothing`* a fresh vocabulary is built from the
+   observed characters using `build_vocabulary(chars; vocab_options...)`.
+
+   Minimal defaults  
+   `vocab_options = Dict(:min_freq=>1,  :special_tokens => ["<unk>"])`
+
+   *When a `Vocabulary` is supplied* it is left intact **except** that
+   `ensure_unk!` is called - if `unk_id ≤ 0` a new `<unk>` entry is
+   appended and a repaired copy is returned.
+
+5. **IDs** - `chars_to_ids`
+
+   `id_options` go straight through (`add_new`, `update_counts`, ...).
+   Default `Dict(:add_new=>false, :update_counts=>true)`.
+
+   *`update_counts=true` mutates `vocab.counts`*
+
+
+ARGUMENTS
+
+- `corpus_input` :: `AbstractString` — raw text *or* path
+- `from_file`    - set `false` if the argument is guaranteed to be text
+- `vocab`        - pre-built `Vocabulary` or `nothing`.
+- `vocab_options`,`clean_options`,`char_options`,`id_options`
+  - see tables above
+
+RETURNS Named tuple  
 
 ```julia
-# Example 1: Basic usage, build vocabulary automatically
-text = "Hello World! 123"
-result = preprocess_for_char_embeddings(text)
-
-# Expected output structure (IDs depend on generated vocab):
-# (char_ids = [..., ...], 
-#  vocabulary = Vocabulary(...), 
-#  chars = ["H", "e", "l", "l", "o", " ", "W", "o", "r", "l", "d", "!", " ", "1", "2", "3"], 
-#  cleaned_text = "Hello World! 123")
-```
-
-```julia
-# Example 2: Using a pre-built vocab and custom cleaning (lowercase)
-char_map = Dict("<unk>" => 1, "h" => 2, "e" => 3, "l" => 4, "o" => 5, " " => 6, "w" => 7, "r" => 8, "d" => 9)
-inv_char_map = Dict(v => k for (k, v) in char_map)
-my_vocab = VocabularyModule.Vocabulary(char_map, inv_char_map, Dict{Int,Int}(), 1)
-text = "Hello World!"
-result = preprocess_for_char_embeddings(text; 
-    vocab=my_vocab, 
-    clean_options=Dict(:case_transform=>:lower, :remove_punctuation=>true)
+(
+    char_ids      = Vector{Int},        # integer sequence
+    vocabulary    = Vocabulary,         # built or repaired vocab
+    chars         = Vector{String},     # grapheme tokens
+    cleaned_text  = String              # final cleaned text
 )
 
-# Expected output (using the provided vocab, punctuation removed):
-# (char_ids = [2, 3, 4, 4, 5, 6, 7, 5, 8, 4, 9], 
-#  vocabulary = my_vocab, 
-#  chars = ["h", "e", "l", "l", "o", " ", "w", "o", "r", "l", "d"], 
-#  cleaned_text = "hello world")
-```
+julia> txt = "Hello  World!  😊";
+julia> res = preprocess_for_char_embeddings(txt; from_file=false);
+
+julia> res.chars
+["H","e","l","l","o"," ","W","o","r","l","d","!"," ","😊"]
+
+# lock vocabulary, lowercase, drop punctuation & spaces
+julia> opts = (
+         clean_options = Dict(
+             :case_transform        => :lower,
+             :do_remove_punctuation => true),
+         char_options  = Dict(:keep_space=>false)
+       )
+julia> res2 = preprocess_for_char_embeddings(txt; vocab=res.vocabulary; opts...)
+````
 """
 function preprocess_for_char_embeddings(corpus_input::Union{AbstractString, String};
                                         from_file::Bool = true,
@@ -107,7 +133,11 @@ function preprocess_for_char_embeddings(corpus_input::Union{AbstractString, Stri
                                         char_options::Dict=Dict(),
                                         id_options::Dict=Dict())
 
-    
+    #read Corpus (if file path)
+    text = from_file && isfile(corpus_input) ?
+           read(corpus_input, String) :
+           String(corpus_input) 
+
     # Minimal cleaning suitable for character models
     default_clean_options = Dict(
         :unicode_normalize => true,
@@ -115,25 +145,23 @@ function preprocess_for_char_embeddings(corpus_input::Union{AbstractString, Stri
         :do_remove_punctuation => false,
         :do_remove_symbols => false,
         :do_remove_emojis => false,
+        :collapse_whitespace  => false,
         :case_transform => :none # Usually keep case for char models
     )
-    # Merge user options with defaults
+
     final_clean_options = merge(default_clean_options, clean_options)
+    collapse_ws = pop!(final_clean_options, :collapse_whitespace, false)
 
-    default_id_options = Dict(:add_new=>false, :update_counts=>true)
-    final_id_options = merge(default_id_options, id_options)
-    
-
-    #read Corpus (if file path)
-    text = from_file && isfile(corpus_input) ?
-           read(corpus_input, String) :
-           String(corpus_input)
-
-    #cleaning (using defaults + user options)
     cleaned_text = clean_text(text; final_clean_options...)
 
+    if collapse_ws
+        cleaned_text = normalize_whitespace(cleaned_text; preserve_newlines=false)
+    end
+
     #character Tokenization
-    chars = tokenize_char(cleaned_text; char_options...)
+    default_char_options = Dict(:keep_space => true)
+    final_char_options   = merge(default_char_options, char_options)
+    chars = tokenize_char(cleaned_text; final_char_options...)
 
     #determine/Build Vocabulary
     if vocab === nothing
@@ -163,10 +191,14 @@ function preprocess_for_char_embeddings(corpus_input::Union{AbstractString, Stri
                                  counts,
                                  unk_id)
     else
-        final_vocab = vocab
+        final_vocab = ensure_unk!(vocab)   # auto-repair ##final_vocab = vocab
     end
 
     #convert characters to IDs
+    default_id_options = Dict(:add_new => false, :update_counts => true)
+    final_options = merge(default_id_options, id_options)
+    final_id_options   = merge(default_id_options, id_options)
+
     ids = chars_to_ids(chars, final_vocab; final_id_options...)
 
     return (char_ids=ids,

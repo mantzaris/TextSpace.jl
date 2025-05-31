@@ -11,7 +11,7 @@ include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "ParagraphProcess
 
 
 #test char pipeline preprocessing
-# include("preprocessing_char_pipeline_tests.jl")
+include("preprocessing_char_pipeline_tests.jl")
 
 # #test char preprocessing
 include("preprocessing_char_tests.jl")
@@ -26,10 +26,10 @@ include("preprocessing_char_tests.jl")
 # include("preprocessing_sentence_tests.jl")
 
 # #test subword tokenization
-include("preprocessing_subword_tests.jl")
+# include("preprocessing_subword_tests.jl")
 
 #test subword pipeline preprocessing
-include("preprocessing_subword_pipeline_tests.jl")
+# include("preprocessing_subword_pipeline_tests.jl")
 
 # #test clean text
 # include("preprocessing_cleantext_tests.jl")

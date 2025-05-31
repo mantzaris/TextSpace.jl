@@ -13,11 +13,11 @@ include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "Preprocessing.jl
     @test out.cleaned_text == txt
 
     #tokenisation: default keeps case, drops spaces
-    @test out.chars == ["H","e","l","l","o","😊"]
+    @test out.chars == ["H","e","l","l","o"," ","😊"]
 
     # <unk> exists and has a valid positive id
     @test haskey(out.vocabulary.token2id, "<unk>")
-    @test out.vocabulary.unk_id ≥ 1
+    @test out.vocabulary.unk_id >= 1
 
     #char_ids are a 1-to-1 mapping of the returned characters
     @test out.char_ids ==
@@ -173,7 +173,7 @@ end
 
 
 @testset "preprocess_for_char_embeddings - large corpus smoke-test" begin
-    #build a ~250 kB synthetic corpus and persist it
+    #build a approx 250 kB synthetic corpus and persist it
     
     sentence   = "The quick brown fox jumps over the lazy dog. "
     big_text   = repeat(sentence, 5000)              #225 kB
@@ -246,7 +246,7 @@ end
     
     #logic checks
     @test length(out.cleaned_text) > 100_000
-    @test length(out.chars) == count(!isspace, out.cleaned_text) 
+    @test length(out.chars) == length(Unicode.graphemes(out.cleaned_text))
     @test all(c in keys(out.vocabulary.token2id) for c in ["a","e","t"]) 
 
     res_unk = preprocess_for_char_embeddings("§";
@@ -257,4 +257,245 @@ end
     #clean up
     rm(path; force = true)
     @test !isfile(path)
+end
+
+
+@testset "preprocess_for_char_embeddings - option matrix" begin
+    #cleaning / whitespace / punctuation / accent flags
+    raw = "Café   \t\n🚀!!  "    # accents, repeated blanks, emoji, punct
+
+    clean_opts = Dict(
+        :case_transform        => :lower,
+        :do_remove_punctuation => true,
+        :do_remove_accents     => true,
+        :collapse_whitespace   => true,     # turn runs of blanks -> one space
+    )
+    char_opts  = Dict(:keep_space => false) # drop the single space we kept
+    outA = preprocess_for_char_embeddings(raw;
+                from_file      = false,
+                clean_options  = clean_opts,
+                char_options   = char_opts)
+
+    @test outA.cleaned_text == "cafe 🚀"          # accent stripped, blanks to 1, punct gone
+    @test outA.chars == ["c","a","f","e","🚀"]    # no space token
+    @test length(outA.char_ids) == 5
+
+    #space-keeping + Unicode-normalisation left intact
+    raw2 = "Fiancée " * "\u202F" * "Ωmega"        # NARROW NBSP between words
+    outB = preprocess_for_char_embeddings(raw2;
+                clean_options = Dict(:unicode_normalize => true),  # NFC default
+                char_options  = Dict(:keep_space => true))
+
+    @test " " in outB.chars                      # space token kept
+    @test occursin("fiancée", lowercase(outB.cleaned_text))  # NFC preserved é
+
+    #external vocabulary + add_new / update_counts flags
+    # make a tiny vocab with <unk>, a, b
+    tok2id = Dict("<unk>"=>1, "a"=>2, "b"=>3)
+    id2tok = ["<unk>","a","b"]
+    extvoc = TextSpace.Preprocessing.Vocabulary(tok2id, id2tok, Dict{Int,Int}(), 1)
+
+    txtC = "abx"    # 'x' is OOV
+    outC1 = preprocess_for_char_embeddings(txtC;
+                 vocab       = extvoc,
+                 char_options=Dict(:keep_space=>false),
+                 id_options  = Dict(:add_new=>false, :update_counts=>false))
+
+    @test outC1.char_ids == [2,3,1]          # x -> unk_id
+    @test !haskey(extvoc.token2id, "x")      # vocab unchanged
+
+    # same text, but now allow growth and counting
+    outC2 = preprocess_for_char_embeddings(txtC;
+                 vocab       = extvoc,
+                 id_options  = Dict(:add_new=>true,  :update_counts=>true))
+
+    @test extvoc.token2id["x"] == length(extvoc.id2token)  # new token inserted
+    @test outC2.char_ids[end] == extvoc.token2id["x"]
+    @test extvoc.counts[ extvoc.token2id["x"] ] == 1       # counts updated
+
+    #file-path input (temp file) + ensure_unk! auto-repairs
+    mktemp() do path, io
+        write(io, "§")             # char not in extvoc
+        close(io)
+
+        broken = TextSpace.Preprocessing.Vocabulary(Dict("a"=>1), ["a"], Dict{Int,Int}(), 0)
+        outD   = preprocess_for_char_embeddings(path;
+                    from_file = true,
+                    vocab     = broken,            # will create *new* vocab
+                    id_options= Dict(:add_new=>false))
+
+        #the pipeline returns a *new* repaired vocabulary
+        @test outD.vocabulary !== broken
+        @test outD.vocabulary.unk_id >= 1
+        @test outD.char_ids[1] == outD.vocabulary.unk_id
+
+
+        rm(path; force=true)
+    end
+end
+
+
+
+@testset "preprocess_for_char_embeddings - full option sweep" begin
+    #cleaning + whitespace + accent/punct/emoji removal
+    raw = "Café   \t\n🚀!!  —  Ωmega🙂"
+
+    clean_opts = Dict(
+        :case_transform        => :lower,
+        :do_remove_punctuation => true,
+        :do_remove_symbols     => true,
+        :do_remove_emojis      => true,
+        :do_remove_accents     => true,
+        :collapse_whitespace   => true,   # collapse runs - single space
+    )
+    char_opts = Dict(:keep_space => false)
+    outA = preprocess_for_char_embeddings(raw;
+                clean_options = clean_opts,
+                char_options  = char_opts,
+                from_file     = false)
+
+    @test occursin("cafe ωmega", outA.cleaned_text)          # accent stripped, lower-cased
+    @test !occursin('🚀', outA.cleaned_text) && !occursin('🙂', outA.cleaned_text)
+    @test !occursin('—', outA.cleaned_text)                  # em-dash removed by punctuation flag
+    @test " " ∉ outA.chars                                   # because keep_space=false
+    @test length(outA.char_ids) == length(outA.chars)
+
+    #keep_space = true + NFC normalisation only
+    raw2 = "Fiancée " * "\u202F" * "Ωmega"   # NARROW NBSP between words
+    outB = preprocess_for_char_embeddings(raw2;
+                clean_options = Dict(:unicode_normalize => true, :case_transform=>:lower),
+                char_options  = Dict(:keep_space => true),
+                from_file     = false)
+
+    @test " " in outB.chars
+    @test occursin("fiancée ωmega", outB.cleaned_text)
+
+    #external vocabulary + add_new / update_counts
+    tok2id = Dict("<unk>"=>1, "a"=>2, "b"=>3)
+    id2tok = ["<unk>","a","b"]
+    extvoc = TextSpace.Preprocessing.Vocabulary(tok2id, id2tok, Dict{Int,Int}(), 1)
+
+    # add_new=false  keeps OOV as unk
+    r1 = preprocess_for_char_embeddings("abx";
+            vocab      = extvoc,
+            id_options = Dict(:add_new=>false, :update_counts=>false),
+            char_options = Dict(:keep_space=>false))
+    @test r1.char_ids == [2,3,1]
+    @test !haskey(extvoc.token2id, "x")
+
+    # add_new=true  extends vocab and updates counts
+    r2 = preprocess_for_char_embeddings("abx";
+            vocab      = extvoc,
+            id_options = Dict(:add_new=>true, :update_counts=>true))
+    new_id = extvoc.token2id["x"]
+    @test r2.char_ids[end] == new_id
+    @test extvoc.counts[new_id] == 1
+
+    #file input + ensure_unk! auto-repair
+    mktemp() do path, io
+        write(io, "§"); close(io)
+
+        broken = TextSpace.Preprocessing.Vocabulary(Dict("a"=>1), ["a"],
+                                                    Dict{Int,Int}(), 0)   # unk_id = 0
+
+        outD = preprocess_for_char_embeddings(path;
+                    from_file = true,
+                    vocab     = broken,
+                    id_options = Dict(:add_new=>false))
+
+        @test outD.vocabulary !== broken   # got a repaired copy
+        @test outD.vocabulary.unk_id ≥ 1
+        @test outD.char_ids[1] == outD.vocabulary.unk_id
+
+        rm(path; force=true)
+    end
+
+    #min_freq filtering
+    r5 = preprocess_for_char_embeddings("xxxyyZ";
+            vocab_options = Dict(:min_freq=>2))
+    @test !haskey(r5.vocabulary.token2id, "Z")
+    @test r5.char_ids[end] == r5.vocabulary.unk_id
+end
+
+
+
+@testset "preprocess_for_char_embeddings - curated UTF-8 hammer" begin
+    #paragraph: 8 sentences with new-lines, tabs, ZWSP, emoji,
+    #  combining marks, bidi controls, ligatures, NBSP, narrow NBSP,
+    #  and a zero-width joiner sequence
+    zwsp   = "\u200B"                       # ZERO-WIDTH SPACE
+    nbsp   = "\u00A0"                       # NBSP
+    nnbsp  = "\u202F"                       # NARROW NBSP
+    rle    = "\u202B"                       # RTL EMBEDDING
+    pdf    = "\u202C"                       # POP DIR. FORMAT
+    ligfi  = "ﬁ"
+    combé  = "e\u0301"                      # e + COMBINING ACUTE
+    famemo = "👨‍👩‍👧‍👦"                    # family emoji with ZWJ
+    astro  = "👩🏽‍🚀"
+    para = """
+    Once upon a  time,\tthere were two cafés.$(nbsp)$(nbsp)
+    They said: “$(ligfi)\u200Breﬂies?!  No way!”\n
+    Meanwhile, 数学 is fun; $nnbsp but $(rle)مرحبا بالعالم$(pdf) was written backwards.
+    Tabs,  spaces,\n\nnew-lines, and $zwsp zero-widths $zwsp hide! $astro went to the 🌖.
+    $famemo danced in the night… $(combé)!
+    """
+
+    #conservative cleaning (NFC only) + keep spaces
+    outA = preprocess_for_char_embeddings(para;
+            clean_options = Dict(:unicode_normalize=>true),
+            char_options  = Dict(:keep_space=>true),
+            from_file     = false)
+
+    @test occursin("café", outA.cleaned_text)      # accent preserved
+    @test '🌖' in outA.cleaned_text
+    @test '\n' ∉ outA.cleaned_text                 # normalize_whitespace default
+    @test " " in outA.chars                        # spaces kept
+    @test length(outA.chars) == length(Unicode.graphemes(outA.cleaned_text))
+
+    #aggressive emoji + punctuation + accent removal, collapse whitespace, drop spaces
+    outB = preprocess_for_char_embeddings(para;
+            clean_options = Dict(
+                :do_remove_emojis      => true,
+                :do_remove_punctuation => true,
+                :do_remove_accents     => true,
+                :collapse_whitespace   => true,
+                :case_transform        => :lower),
+            char_options  = Dict(:keep_space=>false),
+            from_file     = false)
+
+    @test !occursin('🌖', outB.cleaned_text) && !occursin('👨', outB.cleaned_text)
+    @test !occursin("¡", outB.cleaned_text)        # punctuation gone
+    @test !occursin("é", outB.cleaned_text)        # accent stripped
+    @test !occursin(r"\s\s", outB.cleaned_text)    # no double blanks
+    @test " " ∉ outB.chars                         # spaces dropped
+    @test outB.cleaned_text == lowercase(outB.cleaned_text)
+
+    #symbols removed but punctuation kept; case upper
+    outC = preprocess_for_char_embeddings(para;
+            clean_options = Dict(
+                :do_remove_symbols     => true,   # removes currency, math, emoji
+                :do_remove_emojis      => false,  # but we already stripped symbols
+                :case_transform        => :upper),
+            char_options = Dict(:keep_space=>true),
+            from_file    = false)
+
+    @test occursin("CAFÉ", outC.cleaned_text)
+    @test '🌖' ∉ outC.cleaned_text                 # symbol removed
+    @test 'É' ∈ outC.cleaned_text                 # accent still there
+    @test any(c -> isuppercase(c[1]), outC.chars) # uppercase present
+
+    #high min_freq filters rare glyphs; ensure OOV-><unk>
+    rare_opts = Dict(:min_freq => 10)
+    rD  = preprocess_for_char_embeddings(para;
+            vocab_options = rare_opts,
+            char_options  = Dict(:keep_space=>false),
+            from_file     = false)
+
+    #rare glyph '🌖' should NOT be in the pruned vocabulary
+    @test !haskey(rD.vocabulary.token2id, "🌖")
+
+    #every occurrence in the corpus must therefore map to <unk>
+    @test all(id == rD.vocabulary.unk_id
+            for (tok,id) in zip(rD.chars, rD.char_ids) if tok == "🌖")
+
 end

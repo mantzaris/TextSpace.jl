@@ -108,9 +108,6 @@ function tfidf_matrix(docs::AbstractVector{<:AbstractVector{<:Integer}},
 end
 
 
-
-
-
 """
     batch_iter(seqs, batch_size;
                shuffle     = true,

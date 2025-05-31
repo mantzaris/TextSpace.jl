@@ -159,3 +159,20 @@ end
 function load_vocabulary(filename::String)
     return JSON.parsefile(filename)
 end
+
+
+#TODO: test this!!!
+function ensure_unk!(v::Vocabulary; token="<unk>")
+    v.unk_id ≥ 1 && return v                   # valid so no change
+
+    # copy mutable fields
+    tok2id = copy(v.token2id)
+    id2tok = copy(v.id2token)
+    counts = copy(v.counts)
+
+    push!(id2tok, token)
+    tok2id[token] = length(id2tok)
+    new_unk_id    = length(id2tok)
+
+    return Vocabulary(tok2id, id2tok, counts, new_unk_id)
+end
