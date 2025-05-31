@@ -183,6 +183,54 @@ end
 end
 
 
+@testset "ensure_unk! - behaviour matrix" begin
+    # bring the type and the helper in without clashing with a
+    # similarly-named struct that may exist in Main
+    # import TextSpace.Preprocessing: Vocabulary, ensure_unk!
+
+    #already-valid vocabulary - same object returned
+    v_ok = Vocabulary(Dict("<unk>"=>1, "a"=>2),
+                      ["<unk>","a"],
+                      Dict(1=>3, 2=>7),
+                      1)
+
+    ret_ok = ensure_unk!(v_ok)
+    @test ret_ok === v_ok
+    @test v_ok.unk_id == 1 && v_ok.id2token[1] == "<unk>"
+
+    #unk_id = 0 and "<unk>" missing -> fresh vocab with new unk
+    v_missing = Vocabulary(Dict("b"=>1), ["b"], Dict{Int,Int}(), 0)
+
+    ret_missing = ensure_unk!(v_missing)
+
+    @test ret_missing !== v_missing
+    @test ret_missing.unk_id == 2
+    @test ret_missing.token2id["<unk>"] == 2
+    @test ret_missing.id2token == ["b", "<unk>"]
+    @test !haskey(v_missing.token2id, "<unk>")          # original untouched
+
+    #unk_id = 0 but "<unk>" already present -> duplicate by design
+    v_dup = Vocabulary(Dict("<unk>"=>1, "c"=>2),
+                       ["<unk>","c"],
+                       Dict{Int,Int}(),
+                       0)
+
+    ret_dup = ensure_unk!(v_dup)
+
+    @test ret_dup !== v_dup
+    @test ret_dup.unk_id == 3
+    @test ret_dup.token2id["<unk>"] == 3
+    @test count(==("<unk>"), ret_dup.id2token) == 2      # two entries
+
+    #counts dict is deep-copied, not aliased
+    cnts = Dict(1=>5)
+    v_cnt = Vocabulary(Dict("x"=>1), ["x"], cnts, 0)
+
+    ret_cnt = ensure_unk!(v_cnt)
+
+    @test ret_cnt.counts == cnts
+    @test ret_cnt.counts !== cnts
+end
 
 
 

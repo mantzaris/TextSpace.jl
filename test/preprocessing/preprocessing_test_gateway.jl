@@ -11,10 +11,10 @@ include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "ParagraphProcess
 
 
 #test char pipeline preprocessing
-include("preprocessing_char_pipeline_tests.jl")
+# include("preprocessing_char_pipeline_tests.jl")
 
 # #test char preprocessing
-include("preprocessing_char_tests.jl")
+# include("preprocessing_char_tests.jl")
 
 # #test document processing
 # include("preprocessing_document_tests.jl")

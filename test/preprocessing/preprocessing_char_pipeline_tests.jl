@@ -48,7 +48,6 @@ include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "Preprocessing.jl
 end
 
 
-
 @testset "preprocess_for_char_embeddings - additional coverage" begin
     
     #clean_options + char_options flags
@@ -103,7 +102,6 @@ end
     end
     @test !isfile(tmp_path)                     # mktemp has removed the file
 end
-
 
 
 @testset "preprocess_for_char_embeddings - edge cases" begin
@@ -171,7 +169,6 @@ end
 end
 
 
-
 @testset "preprocess_for_char_embeddings - large corpus smoke-test" begin
     #build a approx 250 kB synthetic corpus and persist it
     
@@ -220,7 +217,6 @@ end
     rm(path; force=true)
     @test !isfile(path)
 end
-
 
 
 @testset "preprocess_for_char_embeddings - real text download" begin
@@ -335,7 +331,6 @@ end
 end
 
 
-
 @testset "preprocess_for_char_embeddings - full option sweep" begin
     #cleaning + whitespace + accent/punct/emoji removal
     raw = "Café   \t\n🚀!!  —  Ωmega🙂"
@@ -416,7 +411,6 @@ end
     @test !haskey(r5.vocabulary.token2id, "Z")
     @test r5.char_ids[end] == r5.vocabulary.unk_id
 end
-
 
 
 @testset "preprocess_for_char_embeddings - curated UTF-8 hammer" begin
