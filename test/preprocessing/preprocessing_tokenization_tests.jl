@@ -291,55 +291,8 @@ end
 
     #unk_id assertion (only if you added the check)
     bad_voc = Vocabulary(Dict(), String[], Dict{Int,Int}(), 0)
-    @test_throws AssertionError tokens_to_ids(["a"], bad_voc)
+    @test_throws AssertionError tokens_to_ids(["a"], bad_voc)  #TODO: replace with convert_tokens_to_ids
 end
 
 
 
-@testset "docs_to_matrix" begin
-    voc = Vocabulary(Dict("<unk>" => 1, "x"=>2, "y"=>3),
-                     ["<unk>", "x", "y"],
-                     Dict{Int,Int}(), 1)
-
-    docs = [["x","y","x"], ["y"]]
-    mat  = docs_to_matrix(docs, voc)
-
-    @test size(mat) == (3, 2)
-    @test mat[:,1] == [2, 3, 2]              # x y x
-    @test all(mat[2:3, 2] .== 1)             # padding with unk_id
-end
-
-
-@testset "docs_to_matrix more" begin
-    #  build a tiny vocab 
-    voc = Vocabulary(Dict("hello"=>1, "world"=>2, "<unk>"=>3),
-                     ["hello","world","<unk>"],
-                     Dict{Int,Int}(),
-                     3)
-
-    docs = [["hello","world","!"],      # '!' is OOV
-            ["hello"],
-            ["漢字"]]                   # Unicode OOV
-
-    M = docs_to_matrix(docs, voc)       # default pad_value = 3 (unk_id)
-
-    #shape rows = max_len, cols = n_docs
-    @test size(M) == (3, 3)             # longest doc length = 3
-
-    # correct mapping & padding
-    #    col 1: [1,2,3]  ('!' to unk, no pad)
-    @test M[:,1] == [1,2,3]
-    #    col 2: ["hello"] to [1, 3, 3]   (two pads)
-    @test M[:,2] == [1,3,3]
-    #    col 3: ["漢字"]  to [3, 3, 3]
-    @test all(M[2:3,3] .== 3)           # padded with unk_id
-
-    #custom pad_value override
-    P = docs_to_matrix(docs, voc; pad_value = 0)
-    @test P[2:3,2] == [0,0] && P[2:3,3] == [0,0]   # pads are zeros
-    @test P[1,1] == 1 && P[2,1] == 2               # data unchanged
-
-    #empty document list -> empty 0×0 matrix
-    E = docs_to_matrix(Vector{Vector{String}}(), voc)
-    @test size(E) == (0,0)
-end

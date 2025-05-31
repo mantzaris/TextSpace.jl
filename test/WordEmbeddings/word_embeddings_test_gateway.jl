@@ -530,7 +530,7 @@ end
 @testset "sentence encoding helper - word" begin
     using LinearAlgebra: norm
     using Statistics: mean
-    using TextSpace.Preprocessing: tokens_to_ids
+    using TextSpace.Preprocessing: tokens_to_ids  #TODO: replace with convert_tokens_to_ids
 
     # tiny corpus and model
     ids   = repeat(2:6, 200)
@@ -540,7 +540,7 @@ end
 
     # two different in-vocab sentences
     sents   = ["1 1 2", "5 5 4 3"]
-    id_seqs = [tokens_to_ids(String.(split(s)), vocab; add_new = false)
+    id_seqs = [tokens_to_ids(String.(split(s)), vocab; add_new = false) #TODO: replace with convert_tokens_to_ids
            for s in sents]
 
     # pad to same length (pad with <unk>=1)
@@ -592,7 +592,7 @@ end
 
     # simple sentence encoder = mean of word embeddings
     encode(sent) = begin
-        ids = PP.tokens_to_ids(String.(split(lowercase(sent))), vocab;
+        ids = PP.tokens_to_ids(String.(split(lowercase(sent))), vocab; #TODO: replace with convert_tokens_to_ids
                                add_new = false)
         mean(E[:, ids]; dims = 2) |> vec
     end
@@ -621,7 +621,7 @@ end
     WE = TextSpace.WordEmbeddings
     using LinearAlgebra: dot, norm
 
-    # ───────────────────────── 1. build a non-trivial corpus ─────────────────────
+    # build a non-trivial corpus 
     raw_text = repeat("""
         Thoroughly conscious ignorance is the prelude to every real advance in science. James Clerk Maxwell.
 

@@ -133,43 +133,7 @@ function tokenize_batch(docs::AbstractVector{<:AbstractString};
 end
 
 
-"""
-    tokens_to_ids(tokens, vocab; add_new=false) -> Vector{Int}
-"""
-function tokens_to_ids(tokens::AbstractVector{<:AbstractString},
-                       vocab::Vocabulary;
-                       add_new::Bool = false)
-
-    @assert vocab.unk_id ≥ 1 "Vocabulary.unk_id must be a positive Int"
-
-    out = Vector{Int}(undef, length(tokens))
-    for (i, tok) in pairs(tokens)
-        id = get(vocab.token2id, tok, vocab.unk_id)
-        if id == vocab.unk_id && add_new
-            id = length(vocab.id2token) + 1
-            vocab.token2id[tok] = id
-            push!(vocab.id2token, tok)
-        end
-        out[i] = id
-    end
-    return out
-end
-
-
-"""
-    docs_to_matrix(token_seqs, vocab; pad_value=vocab.unk_id)
-
-Runs `tokens_to_ids` on each document and pads to a matrix
-(using `pad_sequences` from `TextVectorization.jl`).
-"""
-function docs_to_matrix(token_seqs::AbstractVector{<:AbstractVector{<:AbstractString}},
-                        vocab::Vocabulary;
-                        pad_value::Int = vocab.unk_id)
-
-    isempty(token_seqs) && return Matrix{Int}(undef, 0, 0)   # early exit
-
-    id_seqs = [tokens_to_ids(ts, vocab) for ts in token_seqs]
-    pad_sequences(id_seqs; pad_value)
-end
-
-
+tokens_to_ids(tokens, vocab; add_new=false) =
+    convert_tokens_to_ids(tokens, vocab;
+                          add_new       = add_new,
+                          update_counts = false)

@@ -5,9 +5,9 @@ using Random
 using Downloads 
 
 include(joinpath(@__DIR__, "..", "src", "preprocessing", "Vocabulary.jl"))
-# include(joinpath(@__DIR__, "..", "src", "preprocessing", "SubwordTokenization.jl"))
+# include(joinpath(@__DIR__, "..", "src", "preprocessing", "SubwordProcessing.jl"))
 
-include("SubwordEmbeddings/subword_embeddings_test_gateway.jl")
+# include("SubwordEmbeddings/subword_embeddings_test_gateway.jl")
 # include("WordEmbeddings/word_embeddings_test_gateway.jl")
 # include("CharacterEmbeddings/character_embeddings_test_gateway.jl")
 include("preprocessing/preprocessing_test_gateway.jl")

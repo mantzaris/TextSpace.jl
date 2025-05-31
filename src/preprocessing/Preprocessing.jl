@@ -9,7 +9,7 @@ include(joinpath(@__DIR__, "Tokenization.jl"))        #  -> tokenize
 include(joinpath(@__DIR__, "CharProcessing.jl"))      #  -> tokenize_char
 include(joinpath(@__DIR__, "SentenceProcessing.jl"))  #  -> split_sentences
 include(joinpath(@__DIR__, "ParagraphProcessing.jl")) #  -> split_paragraphs, paragraph_windows
-include(joinpath(@__DIR__, "SubwordTokenization.jl")) #  -> train_bpe, load_bpe, encode, 
+include(joinpath(@__DIR__, "SubwordProcessing.jl")) #  -> train_bpe, load_bpe, encode, 
 include(joinpath(@__DIR__, "TextVectorization.jl"))   #  -> pad_sequences, tfidf_matrix, 
 include(joinpath(@__DIR__, "DocumentProcessing.jl"))  #  -> process_document, document_batch_iter
 
@@ -343,7 +343,7 @@ function preprocess_for_word_embeddings(
     vocab = Vocabulary(vdict["token_to_index"], vdict["index_to_token"], counts, unk_id)
 
     #  ids 
-    sent_ids = [tokens_to_ids(toks, vocab; add_new=false) for toks in tokenised]
+    sent_ids = [tokens_to_ids(toks, vocab; add_new=false) for toks in tokenised]  #TODO: replace with convert_tokens_to_ids
 
     return (word_ids            = sent_ids,
             vocabulary          = vocab,
@@ -495,7 +495,7 @@ function preprocess_for_sentence_embeddings(corpus_input::Union{AbstractString, 
 
         # Convert tokens to IDs for each sentence using the built vocab
         sent_token_ids = [Tokenization.tokens_to_ids(tokens, sent_vocab; default_id_options...) for tokens in tokenized_sentences]
-    end
+    end #TODO: replace with convert_tokens_to_ids
 
     return (sentences=sentences_split, # Return the split sentences
             tokenized_sentences=tokenized_sentences,
@@ -793,7 +793,7 @@ function preprocess_for_document_embeddings(corpus_input::Union{AbstractString, 
                                             unk_id)
 
         # Convert tokens to IDs using the built vocab
-        doc_token_ids = Tokenization.tokens_to_ids(doc_tokens, doc_vocab; default_id_options...)
+        doc_token_ids = Tokenization.tokens_to_ids(doc_tokens, doc_vocab; default_id_options...)  #TODO: replace with convert_tokens_to_ids
     end
 
     return (tokens=doc_tokens,

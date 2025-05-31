@@ -118,3 +118,23 @@ function encode_char_batch(texts::AbstractVector{<:AbstractString},
 end
 
 
+"""
+    char_tokens(word; eos=nothing, normalize=false, lower=false) → Vector{String}
+
+Return a vector of Unicode grapheme clusters for **one word**.
+If `eos` is given (e.g. `"</w>"`) it is appended as a boundary marker.
+
+This is a lightweight wrapper around `tokenize_char`.
+"""
+function char_tokens(word::AbstractString;
+                     eos::Union{Nothing,String}=nothing,
+                     normalize::Bool = false,
+                     lower::Bool     = false)
+
+    toks = tokenize_char(word;
+                         normalize = normalize,
+                         lower     = lower,
+                         keep_space = true)  # one word → we keep spaces if any
+    eos === nothing || push!(toks, eos)
+    return toks
+end
