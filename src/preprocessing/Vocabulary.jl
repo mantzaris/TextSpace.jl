@@ -161,7 +161,6 @@ function load_vocabulary(filename::String)
 end
 
 
-#TODO: test this!!!
 function ensure_unk!(v::Vocabulary; token="<unk>")
     v.unk_id >= 1 && return v                   # valid so no change
 
