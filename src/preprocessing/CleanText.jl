@@ -175,5 +175,8 @@ function clean_text(
 end
 
 
-
-
+strip_zero_width(text::AbstractString) =
+    normalize_whitespace(text;
+        strip_ends        = false,   # keep leading / trailing blanks unchanged
+        preserve_newlines = true,    # keep existing line-breaks
+        remove_zero_width = true)    # <- activates the drop-logic

@@ -312,3 +312,15 @@ end
                             case_transform         = :lower,
                             extra_symbols          = ['$', '#'])
 end
+
+
+@testset "strip_zero_width" begin
+    s = "a\u200Bb\u200Dc"
+    @test strip_zero_width(s) == "abc"
+
+    nl = "α\u200B\n\u200Bβ"
+    @test strip_zero_width(nl) == "α\nβ"         # keeps newline
+
+    empty = "\u200B\u200C"
+    @test strip_zero_width(empty) == ""          # all removed
+end

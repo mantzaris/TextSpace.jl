@@ -1,80 +1,125 @@
 
-const NL      = r"\R"            # Unicode newline class
-const PAR_SEP = r"\R{2,}"        # ≥ two consecutive newlines
-
-unwrap_lines(txt::AbstractString) =
-    replace(txt, r"([^\.\?!])\R(?!\R)" => s"\1 ")   # newline w/o sentence end → space
-
-
-"""
-    split_paragraphs(text; unwrap=false, normalize=true) → Vector{String}
-
-Splits on **blank lines** (1+ empty lines).  
-If `unwrap=true`, collapses hard-wrapped lines first.
-"""
-function split_paragraphs(text::AbstractString;
-    unwrap::Bool = true,
-    normalize::Bool = true)
-
-    #coarse split on **blank lines**
-    paras = split(text, PAR_SEP; keepempty = false)
-
-    #optional hard-wrap removal *within* each paragraph
-    unwrap   && (paras = [unwrap_lines(p) for p in paras])
-    normalize && (paras = [normalize_whitespace(String(strip(p))) for p in paras])
-
-    return paras
+if !@isdefined(PAR_SEP)
+    const NL      = r"\R"            # Unicode newline class
+    const PAR_SEP = r"\R{2,}"        # ≥ two consecutive newlines
+    const _BLANK_RE = r"[\p{Zs}\u200B\u200C\u200D]+"
 end
 
 
 """
-    filter_paragraphs(paras; min_chars=25) → Vector{String}
+    unwrap_lines(text) → String
+
+Collapse *hard-wrapped* lines **inside the same sentence** while preserving
+paragraph boundaries.
+
+* A newline that is **not** immediately preceded by `.`, `?`, or `!`
+  **and** is **not** followed by another newline is replaced with a single
+  space.
+
+* Sequences of two or more consecutive newlines (`\\R{2,}`) are kept intact
+  so paragraph breaks survive.
+
+This is UTF-8 safe and language-agnostic; it merely looks at the punctuation
+character right before the newline.
 """
-filter_paragraphs(paras::Vector{String}; min_chars::Int=25) =
-    [p for p in paras if length(p) ≥ min_chars]
+unwrap_lines(txt::AbstractString) =
+    replace(txt, r"(?<![.\?!\r\n])\R(?!\R)" => " ")
 
 
-"""
-    paragraph_windows(paras, max_tokens;
-                      stride=max_tokens,
-                      tokenizer) → Iterator
 
-Yield successive paragraph groups whose total token
-count (according to `tokenizer`) ≤ `max_tokens`.
-"""
+
+function split_paragraphs(text::AbstractString;
+                          unwrap::Bool = false,     # match docstring
+                          normalize::Bool = true)
+    isempty(text) && return String[]
+    sep = r"\R\s*\R"                               # blank lines include spaces
+    paras = split(text, sep; keepempty=false)
+    unwrap   && (paras = map(unwrap_lines, paras))
+    normalize && (paras = map(p -> normalize_whitespace(strip(p)), paras))
+    return paras
+end
+
+
 function paragraph_windows(paras::Vector{String},
                            max_tokens::Int;
-                           stride::Int=max_tokens,
+                           stride::Int = max_tokens,
                            tokenizer)
 
-    idxs = 1:length(paras)
+    max_tokens >= 1 || throw(ArgumentError("max_tokens >= 1"))
+    stride     >= 1 || throw(ArgumentError("stride >= 1"))
+
     function _iter(state)
         i = state
-        i > lastindex(idxs) && return nothing
+        i > length(paras) && return nothing
+
         j, toks = i, 0
-        while j ≤ length(idxs) && toks + length(tokenizer(paras[j])) ≤ max_tokens
-            toks += length(tokenizer(paras[j]))
+        while j <= length(paras)
+            t = length(tokenizer(paras[j]))
+            if t == 0                             # avoid infinite loop
+                t = 1                             # treat as 1 token
+            end
+            if toks + t > max_tokens
+                break
+            end
+            toks += t
             j += 1
         end
-        chunk = paras[i:j-1]
-        next_state = i + max(1, stride)
+
+        if j == i                                 # first paragraph too long
+            chunk = [paras[i]]
+            j     = i + 1
+        else
+            chunk = paras[i:j-1]
+        end
+        next_state = min(i + stride, length(paras) + 1)
         return chunk, next_state
     end
     return _iter, 1
 end
 
 
-"""
-    char_span_to_paragraph_idx(spans, paras) → Vector{Int}
+function merge_short_paragraphs(paragraphs::Vector{String};
+                                min_chars::Int = 40,
+                                min_sents::Union{Nothing,Int} = nothing,
+                                sentence_splitter = split_sentences)
 
-Given vector of `(start,stop)` character spans (1-based offsets in the
-original string) return paragraph indices.
-"""
-function char_span_to_paragraph_idx(spans::Vector{Tuple{Int,Int}},
-                                    paras::Vector{String})
-    cum = cumsum(length.(paras) .+ 1)   # +1 for newline separator
-    map(spans) do (s, _)
-        searchsortedfirst(cum, s)
+    paras = copy(paragraphs)   
+    out = String[]
+    i   = 1
+    while i ≤ length(paras)
+        p = paras[i]
+        short = length(p) < min_chars ||            
+                (min_sents !== nothing &&
+                 length(sentence_splitter(p)) < min_sents)
+
+        if short && !isempty(out)       # merge into previous
+            out[end] = strip(out[end] * " " * p)
+        elseif short && i < length(paras)    # merge with next
+            paras[i+1] = strip(p * " " * paras[i+1])
+        else
+            push!(out, p)
+        end
+        i += 1
     end
+    return out
 end
 
+
+_is_blank_paragraph(p::AbstractString) = isempty(strip(replace(p, _BLANK_RE => " ")))
+
+
+drop_empty_paragraph(paras::Vector{<:AbstractString}) =
+    [String(p) for p in paras if !_is_blank_paragraph(p)]
+
+
+"""
+    filter_paragraphs(paras; min_chars = 25)
+
+Return only those paragraphs whose character length ≥ `min_chars`.
+
+* Accepts any `AbstractVector{<:AbstractString}`.
+* Always returns a `Vector{String}` (converting `SubString` if necessary).
+"""
+filter_paragraphs(paras::AbstractVector{<:AbstractString};
+                  min_chars::Int = 25) =
+    [String(p) for p in paras if length(p) ≥ min_chars]

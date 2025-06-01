@@ -17,13 +17,13 @@ include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "ParagraphProcess
 # include("preprocessing_char_tests.jl")
 
 # #test document processing
-# include("preprocessing_document_tests.jl")
+include("preprocessing_document_tests.jl")
 
 # #test paragraph processing
-# include("preprocessing_paragraph_tests.jl")
+include("preprocessing_paragraph_tests.jl")
 
 # #test sentence processing
-include("preprocessing_sentence_tests.jl")
+# include("preprocessing_sentence_tests.jl")
 
 # #test subword tokenization
 # include("preprocessing_subword_tests.jl")
