@@ -425,8 +425,7 @@ end
 end
 
 
-@testset "filter_paragraphs" begin
-    using TextSpace.Preprocessing.ParagraphProcessing   # adjust if namespaced
+@testset "filter_paragraphs harder" begin
 
     paras = [
         "Short.",                                      # 6 chars

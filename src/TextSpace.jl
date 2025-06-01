@@ -29,14 +29,14 @@ include(joinpath(@__DIR__, "preprocessing", "Preprocessing.jl"))
 @reexport using .Preprocessing
 
 # high-level embeddings
-include(joinpath(@__DIR__, "embeddings", "CharacterEmbeddings.jl"))
-@reexport using .CharacterEmbeddings 
+# include(joinpath(@__DIR__, "embeddings", "CharacterEmbeddings.jl"))
+# @reexport using .CharacterEmbeddings 
 
-include(joinpath(@__DIR__, "embeddings", "WordEmbeddings.jl"))
-@reexport using .WordEmbeddings 
+# include(joinpath(@__DIR__, "embeddings", "WordEmbeddings.jl"))
+# @reexport using .WordEmbeddings 
 
-include(joinpath(@__DIR__, "embeddings", "SubwordEmbeddings.jl"))
-@reexport using .SubwordEmbeddings 
+# include(joinpath(@__DIR__, "embeddings", "SubwordEmbeddings.jl"))
+# @reexport using .SubwordEmbeddings 
 
 # package‑wide utilities
 # include("utils/StringExtras.jl")

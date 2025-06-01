@@ -7,7 +7,7 @@ end
 
 
 """
-    unwrap_lines(text) → String
+    unwrap_lines(text) -> String
 
 Collapse *hard-wrapped* lines **inside the same sentence** while preserving
 paragraph boundaries.
@@ -24,8 +24,6 @@ character right before the newline.
 """
 unwrap_lines(txt::AbstractString) =
     replace(txt, r"(?<![.\?!\r\n])\R(?!\R)" => " ")
-
-
 
 
 function split_paragraphs(text::AbstractString;
@@ -120,6 +118,10 @@ Return only those paragraphs whose character length ≥ `min_chars`.
 * Accepts any `AbstractVector{<:AbstractString}`.
 * Always returns a `Vector{String}` (converting `SubString` if necessary).
 """
-filter_paragraphs(paras::AbstractVector{<:AbstractString};
-                  min_chars::Int = 25) =
-    [String(p) for p in paras if length(p) ≥ min_chars]
+function filter_paragraphs(paras::AbstractVector{<:AbstractString};
+                           min_chars::Int = 25)
+    [String(p) for p in paras if _par_width(p) ≥ min_chars]
+end
+
+
+_par_width(p::AbstractString) = textwidth(p)

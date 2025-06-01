@@ -57,7 +57,7 @@ function build_vocabulary_bpe(
         sub_freq[tok] = get(sub_freq, tok, 0) + 1
     end
 
-    #build index ↔ token arrays
+    #build index to/from token arrays
     sorted = sort(collect(keys(sub_freq));
                   by = t -> sub_freq[t], rev = true)
 

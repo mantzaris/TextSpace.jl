@@ -9,7 +9,7 @@ using Random, Unicode
 
     txt2 = "100% ©right™ + \$value\$"
     @test remove_punctuation(txt2; remove_symbols = true) ==
-          "100 right  value"                 # ← “right” stays; symbols removed
+          "100 right  value"                 # 'right' stays; symbols removed
 
     txt3 = "foo\$bar#baz!"
     @test remove_punctuation(txt3; extra_symbols = ['$', '#']) == "foobarbaz"

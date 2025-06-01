@@ -1,3 +1,20 @@
+#TODO: \p{Emoji} JuliaLang Base.Unicode 1.11 has :Emoji
+if !@isdefined(EMOJI_RANGES)
+    const EMOJI_RANGES = Tuple{UInt32,UInt32}[
+        (0x1F300, 0x1F5FF),
+        (0x1F600, 0x1F64F),
+        (0x1F680, 0x1F6FF),
+        (0x1F700, 0x1F77F),
+        (0x1F900, 0x1F9FF),
+        (0x1FA70, 0x1FAFF),
+        (0x2600,  0x26FF),
+        (0x2700,  0x27BF),
+        (0x1F1E6, 0x1F1FF),
+        (0x1F3FB, 0x1F3FF),
+        (0xFE0F,  0xFE0F),   #VS-16
+        (0x200D,  0x200D),   #ZWJ
+    ]
+end
 
 
 """
@@ -41,22 +58,6 @@ function remove_punctuation(
     end
     return stripped
 end
-
-
-const EMOJI_RANGES = Tuple{UInt32,UInt32}[
-    (0x1F300, 0x1F5FF),
-    (0x1F600, 0x1F64F),
-    (0x1F680, 0x1F6FF),
-    (0x1F700, 0x1F77F),
-    (0x1F900, 0x1F9FF),
-    (0x1FA70, 0x1FAFF),
-    (0x2600,  0x26FF),
-    (0x2700,  0x27BF),
-    (0x1F1E6, 0x1F1FF),
-    (0x1F3FB, 0x1F3FF),
-    (0xFE0F,  0xFE0F),   #VS-16
-    (0x200D,  0x200D),   #ZWJ
-]
 
 
 """

@@ -39,7 +39,7 @@ function split_sentences(text::AbstractString;
         starts = stop + 1
     end
 
-    starts ≤ lastindex(text) &&
+    starts <= lastindex(text) &&
         push!(sentences, strip(@view text[starts:end]))
 
     return sentences
@@ -60,8 +60,6 @@ function strip_outer_quotes(s::AbstractString)
     hi = prevind(s, lastindex(s))
     return s[lo:hi]
 end
-
-
 
 
 struct SlidingSentenceWindow{T}

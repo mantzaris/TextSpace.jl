@@ -10,8 +10,8 @@ struct Vocabulary
     unk_id::Int
 end
 
-Vocabulary() = Vocabulary(Dict{String,Int}(), String[], Dict{Int,Int}(), 0)
 
+Vocabulary() = Vocabulary(Dict{String,Int}(), String[], Dict{Int,Int}(), 0)
 
 
 function build_vocabulary(
