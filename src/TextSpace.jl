@@ -25,6 +25,8 @@ using Reexport
 
 #load before using
 include("preprocessing/__init__.jl")
+include("utils/__init__.jl") 
+
 include(joinpath(@__DIR__, "pipeline", "Pipeline.jl"))
 # #now use
 @reexport using .Pipeline
@@ -41,4 +43,6 @@ include(joinpath(@__DIR__, "pipeline", "Pipeline.jl"))
 
 # package‑wide utilities
 # include("utils/StringExtras.jl")
+
+
 end #END MODULE

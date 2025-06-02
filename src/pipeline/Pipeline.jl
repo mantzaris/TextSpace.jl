@@ -1,20 +1,50 @@
 module Pipeline
 
 
-using ..Plumbing          # bring helpers into scope
+using ..Plumbing # low-level helpers (string only)
 
+using ..utils: Vocabulary, convert_tokens_to_ids, pad_sequences
 
-export test1
+export preprocess, preprocess_for_word_embeddings, test1
 
+# simple stub so earlier tests still pass
+test1() = 10
 
-function test1()
-    return 10
+"""
+    preprocess(text; encoder, mode = :batch)
+
+End-to-end *word-level* pipeline.
+
+* `encoder` **must** be a `Vocabulary`.
+* `mode`  — stop at an intermediate stage:
+    `:sentences` to Vector{String}  
+    `:tokens`    to Vector{Vector{String}}  
+    `:ids`       to Vector{Vector{Int}}  
+    `:batch`     to padded Matrix{Int}
+"""
+function preprocess(text::AbstractString;
+                    encoder::Vocabulary,
+                    mode::Symbol = :batch)
+
+    sentences = Plumbing.split_sentences(text)
+    mode == :sentences && return sentences
+
+    token_seqs = Plumbing.tokenize_batch(sentences)
+    mode == :tokens && return token_seqs
+
+    id_seqs = [convert_tokens_to_ids(ts, encoder; add_new=false)
+               for ts in token_seqs]
+    mode == :ids && return id_seqs
+
+    pad_sequences(id_seqs; pad_value = encoder.unk_id)
 end
 
+preprocess_for_word_embeddings(args...; kw...) =
+    preprocess(args...; kw...)
 
-end
 
 
+end  # module Pipeline
 
 
 

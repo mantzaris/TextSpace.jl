@@ -1,4 +1,4 @@
-include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "Vocabulary.jl"))
+# include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "Vocabulary.jl"))
 
 
 @testset "build_vocabulary — happy path" begin

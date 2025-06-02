@@ -1,17 +1,17 @@
-
+module VocabularyCore
 
 using JSON
 
+export Vocabulary, convert_tokens_to_ids, convert_ids_to_tokens
 
-struct Vocabulary
+mutable struct Vocabulary
     token2id::Dict{String,Int}
     id2token::Vector{String}
     counts::Dict{Int,Int}
     unk_id::Int
 end
 
-
-Vocabulary() = Vocabulary(Dict{String,Int}(), String[], Dict{Int,Int}(), 0)
+Vocabulary(unk::String="<unk>") = Vocabulary(Dict(unk=>1), [unk], Dict{Int,Int}(), 1)
 
 
 function build_vocabulary(
@@ -175,3 +175,7 @@ function ensure_unk!(v::Vocabulary; token="<unk>")
 
     return Vocabulary(tok2id, id2tok, counts, new_unk_id)
 end
+
+
+
+end #end module

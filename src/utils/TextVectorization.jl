@@ -1,3 +1,5 @@
+module TextVectorization
+
 
 using LinearAlgebra
 using Statistics
@@ -151,3 +153,4 @@ function batch_iter(seqs::AbstractVector{<:AbstractVector{<:Integer}},
 end
 
 
+end #module
