@@ -77,7 +77,7 @@ function tokenize(text::AbstractString;
 
     if strip_punctuation                     # Bool arg
         # fully-qualify the *function* to avoid the name clash
-        toks = TextSpace.Preprocessing.strip_punctuation.(toks)
+        toks = Plumbing.strip_punctuation.(toks)
     end
 
     lower && (toks = lowercase.(toks))

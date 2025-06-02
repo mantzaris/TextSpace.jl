@@ -2,28 +2,6 @@
 using Unicode
 
 
-"""
-    tokenize_char(text;
-                  normalize   = true,
-                  form        = :NFC,
-                  keep_space  = false,
-                  lower       = false) -> Vector{String}
-
-Split *text* into a vector of **Unicode grapheme clusters**.
-
-Keyword flags — identical to the original API
----------------------------------------------
-* `normalize`  - when `true` canonical-normalise to the given `form`
-                 (`:NFC`, `:NFD`, `:NFKC`, `:NFKD`).
-* `keep_space` - include space-like graphemes (`isspace`) in the output.
-* `lower`      - convert *text* to lowercase **after** normalisation.
-
-The function accepts any `AbstractString` and always returns
-`Vector{String}`.  It raises `ArgumentError` on an unsupported
-normal-form symbol and works on Julia 1.6 -> 1.11.
-
-Idempotence: `join(tokenize_char(txt; keep_space=true)) == txt`.
-"""
 function tokenize_char(text::AbstractString;
                        normalize::Bool      = true,
                        form::Symbol         = :NFC,

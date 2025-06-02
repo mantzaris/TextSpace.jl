@@ -23,10 +23,11 @@ module TextSpace
 using Unicode
 using Reexport
 
-#load before using 
-include(joinpath(@__DIR__, "preprocessing", "Preprocessing.jl"))
-#now use
-@reexport using .Preprocessing
+#load before using
+include("preprocessing/__init__.jl")
+include(joinpath(@__DIR__, "pipeline", "Pipeline.jl"))
+# #now use
+@reexport using .Pipeline
 
 # high-level embeddings
 # include(joinpath(@__DIR__, "embeddings", "CharacterEmbeddings.jl"))

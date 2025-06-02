@@ -6,36 +6,29 @@ include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "SentenceProcessi
 include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "ParagraphProcessing.jl"))
 
 
-#test char pipeline preprocessing
-# include("preprocessing_char_pipeline_tests.jl")
+
+#test paragraph processing
+include("preprocessing_paragraph_tests.jl")
 
 
-# #test paragraph processing
-# include("preprocessing_paragraph_tests.jl")
+#test sentence processing
+include("preprocessing_sentence_tests.jl")
 
 
-# #test sentence processing
-# include("preprocessing_sentence_tests.jl")
+#test char preprocessing
+include("preprocessing_char_tests.jl")
 
 
-# #test char preprocessing
-# include("preprocessing_char_tests.jl")
+#test the text tokenization
+include("preprocessing_tokenization_tests.jl")
 
 
-#test the vocabulary
-# include("preprocessing_vocaculary_tests.jl")
+#test the textnormalization
+include("preprocessing_textnormalization_tests.jl")
 
 
-# #test the text tokenization
-# include("preprocessing_tokenization_tests.jl")
-
-
-# #test the textnormalization
-# include("preprocessing_textnormalization_tests.jl")
-
-
-# #test clean text
-# include("preprocessing_cleantext_tests.jl")
+#test clean text
+include("preprocessing_cleantext_tests.jl")
 
 
 

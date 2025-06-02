@@ -10,7 +10,9 @@ using Downloads
 # include("SubwordEmbeddings/subword_embeddings_test_gateway.jl")
 # include("WordEmbeddings/word_embeddings_test_gateway.jl")
 # include("CharacterEmbeddings/character_embeddings_test_gateway.jl")
-include("preprocessing/preprocessing_test_gateway.jl")
+# include("preprocessing/preprocessing_test_gateway.jl")
+include("pipeline/preprocessing_pipeline_tests.jl")
+
 
 
 @testset "basic root test" begin
@@ -18,5 +20,4 @@ include("preprocessing/preprocessing_test_gateway.jl")
     text1 = "Hello, World!"
     #only lowercasing and whitespace normalization occur.
     @test text1 == "Hello, World!"
-
 end

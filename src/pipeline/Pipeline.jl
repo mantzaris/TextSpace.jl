@@ -1,11 +1,22 @@
-module Preprocessing
+module Pipeline
 
-include(joinpath(@__DIR__, "CleanText.jl"))
-include(joinpath(@__DIR__, "TextNormalization.jl"))   #  -> clean_text / normalize_whitespace
-include(joinpath(@__DIR__, "Tokenization.jl"))        #  -> tokenize
-include(joinpath(@__DIR__, "CharProcessing.jl"))      #  -> tokenize_char
-include(joinpath(@__DIR__, "SentenceProcessing.jl"))  #  -> split_sentences
-include(joinpath(@__DIR__, "ParagraphProcessing.jl")) #  -> split_paragraphs, paragraph_windows
+
+using ..Plumbing          # bring helpers into scope
+
+
+export test1
+
+
+function test1()
+    return 10
+end
+
+
+end
+
+
+
+
 
 
 # # Export only the high-level pipeline functions
@@ -28,7 +39,7 @@ include(joinpath(@__DIR__, "ParagraphProcessing.jl")) #  -> split_paragraphs, pa
 #                                    clean_options::Dict             = Dict(),
 #                                    char_options::Dict              = Dict(),
 #                                    id_options::Dict                = Dict())
-#         → NamedTuple{char_ids::Vector{Int},
+#         -> NamedTuple{char_ids::Vector{Int},
 #                      vocabulary::Vocabulary,
 #                      chars::Vector{String},
 #                      cleaned_text::String}
@@ -765,5 +776,5 @@ include(joinpath(@__DIR__, "ParagraphProcessing.jl")) #  -> split_paragraphs, pa
 
 
 
-end #END MODULE
+# end #END MODULE
 

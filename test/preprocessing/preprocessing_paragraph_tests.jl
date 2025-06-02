@@ -148,8 +148,6 @@ end
         push!(wins, chunk)
     end
 
-    tok(p) = split(p)
-
     predicate(chunk) = begin
         total = sum(length.(tok.(chunk)))
         total <= 20 || (length(chunk) == 1 && total > 20)
