@@ -1,47 +1,95 @@
 module Pipeline
 
+import ..TextSpace: resource
+import ..Plumbing
+using ..Plumbing: clean_text
+import ..utils as utils
 
-using ..Plumbing # low-level helpers (string only)
-
-using ..utils: Vocabulary, convert_tokens_to_ids, pad_sequences
-
-export preprocess, preprocess_for_word_embeddings, test1
+export preprocess, test1
 
 # simple stub so earlier tests still pass
 test1() = 10
 
+
 """
-    preprocess(text; encoder, mode = :batch)
+    preprocess(text;
+               encoder = nothing,       # word/char vocab  (utils.Vocabulary)
+               subtok  = nothing,       # Symbol, String, or BPETokeniser
+               mode    = :batch,        # :tokens | :ids | :batch
+               clean   = true,
+               split_sentences = true)  ...
 
-End-to-end *word-level* pipeline.
-
-* `encoder` **must** be a `Vocabulary`.
-* `mode`  — stop at an intermediate stage:
-    `:sentences` to Vector{String}  
-    `:tokens`    to Vector{Vector{String}}  
-    `:ids`       to Vector{Vector{Int}}  
-    `:batch`     to padded Matrix{Int}
+If `subtok` is
+  * `:gpt2` or `:bpe_en_30k` - loads bundled artefact
+  * a file path            - loads that file
+  * a `BPETokeniser`       - uses it directly
 """
-function preprocess(text::AbstractString;
-                    encoder::Vocabulary,
-                    mode::Symbol = :batch)
+function preprocess(text::AbstractString; encoder=nothing,
+                    subtok=nothing, mode=:batch, clean=true,
+                    do_split_sentences::Bool=true)
 
-    sentences = Plumbing.split_sentences(text)
-    mode == :sentences && return sentences
+    # 1) sentence & token split
+    sents  = do_split_sentences ? Plumbing.split_sentences(text) : [text]
+    clean && (sents = clean_text.(sents))
+    tokens = Plumbing.tokenize_batch(sents)
 
-    token_seqs = Plumbing.tokenize_batch(sentences)
-    mode == :tokens && return token_seqs
+    # early exits for shallow modes 
+    if mode === :sentences
+        return sents
+    elseif mode === :tokens
+        return tokens
+    end
 
-    id_seqs = [convert_tokens_to_ids(ts, encoder; add_new=false)
-               for ts in token_seqs]
-    mode == :ids && return id_seqs
+    # 2) decide mapping branch
+    if subtok !== nothing
 
-    pad_sequences(id_seqs; pad_value = encoder.unk_id)
+        if isa(subtok, Symbol)
+            subtok = resolve_subtok(subtok)
+        elseif isa(subtok, String)
+            subtok = utils.load_bpe(subtok)
+        elseif subtok isa utils.BPETokeniser
+            # already good
+        elseif subtok !== nothing
+            error("subtok must be Symbol, String, BPETokeniser or nothing")
+        end
+
+        ids = encode_batch(subtok, tokens)
+        pad = 0
+
+    elseif encoder !== nothing
+        ids = [utils.convert_tokens_to_ids(t, encoder) for t in tokens]
+        pad = encoder.unk_id
+
+    else
+        return tokens
+    end
+
+    mode == :ids ? ids : utils.pad_sequences(ids; pad_value=pad)
 end
 
-preprocess_for_word_embeddings(args...; kw...) =
-    preprocess(args...; kw...)
 
+"""
+    resolve_subtok(sym::Symbol) → BPETokeniser
+
+Turn a keyword like `:gpt2` or `:mgpt` into a ready-to-use
+`utils.BPETokeniser` loaded from *src/resources/*.
+"""
+function resolve_subtok(sym::Symbol)
+    res = resource                  # local alias for brevity
+
+    sym === :gpt2    && return utils.load_bpe(res("gpt2_merges.txt"))
+    sym === :mgpt    && return utils.load_bpe(res("mGPT_61Lang1pnt9M_merges.txt"))
+    sym === :roberta && return utils.load_bpe(res("RoBERTa-base_merges.txt"))
+    sym === :mistral && return utils.load_bpe(res("Mistral-24B_32_768ctrl.json"))
+    sym === :xlmr    && return utils.load_bpe(res("XML-RoBERTa_100Lang.json"))
+
+    error("Unknown built-in tokeniser symbol $sym.  \
+           Choose one of :gpt2, :mgpt, :roberta, :mistral, :xlmr")
+end
+
+
+encode_batch(::utils.BPETokeniser, ::Any) =
+    error("encode_batch not implemented yet")
 
 
 end  # module Pipeline

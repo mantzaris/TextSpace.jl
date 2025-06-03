@@ -23,6 +23,8 @@ module TextSpace
 using Unicode
 using Reexport
 
+resource(name) = joinpath(@__DIR__, "resources", name) # e.g. "gpt2_merges.txt"
+
 #load before using
 include("preprocessing/__init__.jl")
 include("utils/__init__.jl") 
@@ -43,6 +45,5 @@ include(joinpath(@__DIR__, "pipeline", "Pipeline.jl"))
 
 # package‑wide utilities
 # include("utils/StringExtras.jl")
-
 
 end #END MODULE
