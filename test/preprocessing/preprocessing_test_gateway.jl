@@ -27,7 +27,7 @@ include("preprocessing_tokenization_tests.jl")
 include("preprocessing_textnormalization_tests.jl")
 
 
-#test clean text
+test clean text
 include("preprocessing_cleantext_tests.jl")
 
 

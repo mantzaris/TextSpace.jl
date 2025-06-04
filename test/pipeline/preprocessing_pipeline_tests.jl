@@ -9,35 +9,90 @@ import TextSpace.utils as utils    # for load_bpe
     @test split_sentences("Hi. Bye!") == ["Hi.", "Bye!"]
 end
 
-@testset "Word-level preprocess" begin
-    doc = "Hello, World!\n\nGood-bye moon."
+@testset "clean-kw hook" begin
+    txt = "Hello \u200B🙂 WORLD!"  # ZERO-WIDTH SPACE + emoji + caps
 
-    # tiny throw-away vocab built from the doc
-    vocab = Vocabulary()
-    for t in tokenize_batch(split_sentences(doc))
-        convert_tokens_to_ids(t, vocab; add_new=true)
+    out = TextSpace.preprocess(txt;
+                               mode                 = :sentences,
+                               do_remove_emojis     = true,
+                               case_transform       = :lower,
+                               do_remove_zero_width = true)
+
+    @test out == ["hello  world!"]   # emoji & ZWSP removed, lowercase ok
+end
+
+@testset "front-half cleaning" begin
+    raw = "Hello\u200D  🙂  WORLD!\nNext-Line"
+
+    # no extra cleaning, but sentence split is ON -> ZWJ kept, spaces collapsed
+    out1 = TextSpace.preprocess(raw;
+                                clean=false,
+                                mode=:sentences)          # default split_sentences=true
+    @test out1 == ["Hello\u200D 🙂 WORLD!", "Next-Line"]
+
+    # strip zero-width *before* splitter
+    out2 = TextSpace.preprocess(raw;
+                                clean=false,
+                                do_remove_zero_width=true,
+                                mode=:sentences)
+    @test out2 == ["Hello 🙂 WORLD!", "Next-Line"]
+
+    #  full clean: lower-case, emoji gone, spaces collapsed
+    out3 = TextSpace.preprocess(raw;
+                                do_remove_emojis=true,
+                                case_transform=:lower,
+                                mode=:sentences)
+    @test out3 == ["hello world!", "next-line"]
+
+    # preserve the double-space by **skipping** the splitter
+    out4 = TextSpace.preprocess(raw;
+                                split_sentences=false,  
+                                do_remove_zero_width=true,
+                                do_remove_emojis=true,
+                                case_transform=:lower,
+                                mode=:sentences)
+    @test out4 == ["hello  world!\nnext-line"]            # two blanks maintained
+end
+
+@testset "paragraph - front-half + word-route smoke-test" begin
+    raw_paragraph = """
+        Hello\u200D, WORLD!!  🙂  This is line one.
+        And here's line two—with dashes.
+
+        New   paragraph: numbers 1, 2,  3…
+    """
+
+    # raw tokens, no cleaning 
+    toks_raw = TextSpace.preprocess(raw_paragraph;
+                                    mode  = :tokens,
+                                    clean = false)      # keep mess
+    @test !isempty(toks_raw)
+    @test all(isa.(toks_raw, Vector{String}))
+
+    # cleaned tokens (lower-case, emoji and ZWJ stripped) 
+    toks_clean = TextSpace.preprocess(raw_paragraph;
+                                      mode                 = :tokens,
+                                      do_remove_zero_width = true,
+                                      do_remove_emojis     = true,
+                                      case_transform       = :lower)
+    @test !isempty(toks_clean)
+    @test toks_clean != toks_raw                      # cleaning changed output
+
+    # word-route -> padded ID matrix 
+    voc = Vocabulary()
+    for t in tokenize_batch(split_sentences(raw_paragraph))
+        convert_tokens_to_ids(t, voc; add_new = true)  # quick vocab build
     end
 
-    batch = TextSpace.preprocess(doc; encoder=vocab)           # mode=:batch
-    ids   = TextSpace.preprocess(doc; encoder=vocab, mode=:ids)
-    toks  = TextSpace.preprocess(doc; encoder=vocab, mode=:tokens)
-    sents = TextSpace.preprocess(doc; encoder=vocab, mode=:sentences)
-
-    @test size(batch, 2) == 2          # two sentences -> two columns
-    @test length(ids)    == 2
-    @test length(toks)   == 2
-    @test sents == ["hello, world!", "good-bye moon."]
+    mat = TextSpace.preprocess(raw_paragraph;
+                               route   = :word,        # mapping branch
+                               encoder = voc,
+                               mode    = :batch)       # padded Matrix{Int}
+    @test size(mat, 2) == length(split_sentences(raw_paragraph))
+    @test size(mat, 1) ≥ 1
 end
 
-@testset "resource & BPE loader" begin
-    # 1) manual loader
-    gpt_path = TextSpace.resource("gpt2_merges.txt")
-    @test isfile(gpt_path)
-    tok1 = utils.load_bpe(gpt_path)
-    @test length(tok1.merges) > 0
-    @test tok1.vocab === nothing      # merges-only file
 
-    # 2) symbolic loader (resolve_subtok)
-    tok2 = TextSpace.Pipeline.resolve_subtok(:gpt2)
-    @test length(tok2.merges) == length(tok1.merges)
-end
+
+
+

@@ -35,7 +35,8 @@ The helper is UTF-8-safe and leaves non-whitespace graphemes unchanged.
 function normalize_whitespace(text::AbstractString;
                               strip_ends::Bool        = true,
                               preserve_newlines::Bool = false,
-                              remove_zero_width::Bool = false)
+                              remove_zero_width::Bool = false,
+                              collapse_spaces::Bool   = true)
 
     isempty(text) && return ""                      # quick exit
 
@@ -52,8 +53,7 @@ function normalize_whitespace(text::AbstractString;
         # remove blanks that precede newline(s)
         t = replace(t, r" +\n" => "\n")
     else
-        # any Unicode whitespace → one space
-        t = replace(t, r"\s+" => " ")
+        collapse_spaces && (t = replace(t, r"\s+" => " "))
     end
 
     strip_ends && (t = strip(t))                    # leading/trailing

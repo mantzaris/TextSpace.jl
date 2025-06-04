@@ -13,60 +13,89 @@ test1() = 10
 
 """
     preprocess(text;
-               encoder = nothing,       # word/char vocab  (utils.Vocabulary)
-               subtok  = nothing,       # Symbol, String, or BPETokeniser
-               mode    = :batch,        # :tokens | :ids | :batch
-               clean   = true,
-               split_sentences = true)  ...
+               unit=:auto,            #  :auto | :word | :subword | :char
+               encoder=nothing,       #  Vocabulary        (word route)
+               subtok=nothing,        #  Symbol/String/BPETokeniser (subword)
+               char_eos=nothing,      #  "</w>" marker     (char route)
+               mode=:batch,           #  :tokens | :ids | :batch | :sentences
+               clean=true,
+               split_sentences=true) → …
 
-If `subtok` is
-  * `:gpt2` or `:bpe_en_30k` - loads bundled artefact
-  * a file path            - loads that file
-  * a `BPETokeniser`       - uses it directly
+* `unit=:auto`      — pick :subword if `subtok` is set, else :word if `encoder`
+                      is set, else :char if `char_eos` ≠ nothing, otherwise
+                      just return raw *tokens*.
+* `unit=:word`      — forces the word route (optionally pass `encoder`).
+* `unit=:subword`   — forces the sub-word route (optionally pass `subtok`;
+                      default is `:gpt2`).
+* `unit=:char`      — forces the character route.
 """
-function preprocess(text::AbstractString; encoder=nothing,
-                    subtok=nothing, mode=:batch, clean=true,
-                    do_split_sentences::Bool=true)
+function preprocess(text::AbstractString;
+                    route = :subword,
+                    # --- granularity / routes --------------------------
+                    unit::Symbol        = :auto,
+                    encoder             = nothing,
+                    subtok              = nothing,
+                    char_eos            = nothing,
 
-    # 1) sentence & token split
-    sents  = do_split_sentences ? Plumbing.split_sentences(text) : [text]
-    clean && (sents = clean_text.(sents))
-    tokens = Plumbing.tokenize_batch(sents)
+                    # --- sentence / token split ------------------------
+                    split_sentences::Bool = true,
 
-    # early exits for shallow modes 
-    if mode === :sentences
-        return sents
-    elseif mode === :tokens
-        return tokens
+                    # --- output shape ----------------------------------
+                    mode::Symbol        = :batch,
+                    # --- cleaning layer --------------------------------
+                    clean::Bool         = true,
+                    do_remove_zero_width::Bool = false,
+                    clean_kw...                     # <- must be last!
+                    )
+
+    #front half: clean -> sentence split -> tokenise
+    if do_remove_zero_width
+        text = Plumbing.strip_zero_width(text)
     end
 
-    # 2) decide mapping branch
-    if subtok !== nothing
+    sents = split_sentences ? Plumbing.split_sentences(text) : [text]
 
-        if isa(subtok, Symbol)
-            subtok = resolve_subtok(subtok)
-        elseif isa(subtok, String)
-            subtok = utils.load_bpe(subtok)
-        elseif subtok isa utils.BPETokeniser
-            # already good
-        elseif subtok !== nothing
-            error("subtok must be Symbol, String, BPETokeniser or nothing")
-        end
+    if clean
+        sents = Plumbing.clean_text.(sents; clean_kw...,
+                                    collapse_spaces = !do_remove_zero_width)
+        #(collapse_spaces = false); 
+    end
 
-        ids = encode_batch(subtok, tokens)
-        pad = 0
+    mode === :sentences && return sents
 
-    elseif encoder !== nothing
+    #word tokenisation
+    tokens = Plumbing.tokenize_batch(sents)
+    mode === :tokens && return tokens
+
+
+    #second half: 
+    if route === :none
+        return tokens                      # nothing to map → just tokens
+    elseif route === :word
+        encoder === nothing && (encoder = Vocabulary())  # build on-the-fly
         ids = [utils.convert_tokens_to_ids(t, encoder) for t in tokens]
         pad = encoder.unk_id
 
+    elseif route === :subword
+        if subtok === nothing         # implicit default
+            subtok = resolve_subtok(:gpt2)
+        elseif isa(subtok, Symbol)
+            subtok = resolve_subtok(subtok)
+        elseif isa(subtok, String)
+            subtok = utils.load_bpe(subtok)
+        end
+        ids = encode_batch(subtok, tokens)          # TODO: implement
+        pad = 0
+
+    elseif route === :char
+        ids = encode_char_batch(tokens; eos=char_eos)    # thin wrapper
+        pad = 0
     else
-        return tokens
+        error("unit must be :auto, :word, :subword or :char")
     end
 
-    mode == :ids ? ids : utils.pad_sequences(ids; pad_value=pad)
+    return mode === :ids ? ids : utils.pad_sequences(ids; pad_value=pad)
 end
-
 
 """
     resolve_subtok(sym::Symbol) → BPETokeniser

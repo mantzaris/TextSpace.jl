@@ -108,7 +108,7 @@ while leaving base characters intact.  Works on Julia 1.6 - 1.11.
 function remove_accents(text::AbstractString)::String
     nfd = Unicode.normalize(text, :NFD)
 
-    if isdefined(Unicode, :combining_class)      # ≥ 1.10 fast path
+    if isdefined(Unicode, :combining_class)      # >= 1.10 fast path
         io = IOBuffer()
         @inbounds for c in nfd
             Unicode.combining_class(c) == 0 && write(io, c)
@@ -151,7 +151,8 @@ function clean_text(
         do_remove_symbols::Bool      = false,
         do_remove_emojis::Bool       = false,
         case_transform::Symbol       = :lower,
-        extra_symbols::AbstractVector{<:AbstractChar} = Char[]
+        extra_symbols::AbstractVector{<:AbstractChar} = Char[],
+        collapse_spaces::Bool        = true,
 )::String
 
     case_transform in (:lower, :upper, :none) ||
@@ -171,7 +172,7 @@ function clean_text(
     end
 
     do_remove_emojis && (t = remove_emojis(t))
-    t = normalize_whitespace(t)               # always final tidy
+    t = normalize_whitespace(t; collapse_spaces = collapse_spaces) # always final tidy
     return t
 end
 

@@ -90,7 +90,7 @@ end
 
 
 """
-    tfidf_matrix(docs, vocab_size; smooth_idf = 1.0) → Matrix{Float64}
+    tfidf_matrix(docs, vocab_size; smooth_idf = 1.0) -> Matrix{Float64}
 
 Return a column-major TF-IDF matrix.  
 `smooth_idf` ≥ 0 controls additive smoothing (set to 0 for raw IDF).
@@ -131,9 +131,9 @@ function batch_iter(seqs::AbstractVector{<:AbstractVector{<:Integer}},
                     rng::AbstractRNG = Random.GLOBAL_RNG)
 
     batch_size ≥ 1 ||
-        throw(ArgumentError("batch_size must be ≥ 1, got $batch_size"))
+        throw(ArgumentError("batch_size must be >= 1, got $batch_size"))
 
-    isempty(seqs) && return (_ -> nothing), 1            # 0×0 iterator
+    isempty(seqs) && return (_ -> nothing), 1            # 0x0 iterator
 
     idx = collect(eachindex(seqs))
     shuffle && Random.shuffle!(rng, idx)

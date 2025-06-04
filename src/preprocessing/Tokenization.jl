@@ -1,5 +1,5 @@
 
-using Unicode                         # stdlib
+using Unicode  
 import Base: isempty
 
 
@@ -26,7 +26,7 @@ load_stopwords(lang::AbstractString = "en") =
 
 
 """
-    basic_tokenize(text; keep_whitespace=false) → Vector{String}
+    basic_tokenize(text; keep_whitespace=false) -> Vector{String}
 
 Splits `text` into words and punctuation.  Whitespace is discarded unless
 `keep_whitespace=true`.
@@ -66,7 +66,7 @@ Returns `Vector{String}` of processed tokens.
 """
 function tokenize(text::AbstractString;
                   lang::AbstractString = "en",
-                  strip_punctuation::Bool = true,   # ← original name
+                  strip_punctuation::Bool = true,   #original name
                   lower::Bool            = true,
                   remove_stopwords::Bool = false,
                   stopwords::Set{String} = STOPWORDS_EN,

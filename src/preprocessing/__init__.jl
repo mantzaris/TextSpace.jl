@@ -9,14 +9,11 @@ include("SentenceProcessing.jl")
 include("ParagraphProcessing.jl")
 
 
-export clean_text,
-       normalize_whitespace,
-       tokenize, 
-       tokenize_batch,
+export clean_text, strip_zero_width, normalize_whitespace,
+       tokenize, tokenize_batch,
        tokenize_char,
        split_sentences,
        split_paragraphs,
        filter_paragraphs
-
 
 end
