@@ -5,97 +5,130 @@ import ..Plumbing
 using ..Plumbing: clean_text
 import ..utils as utils
 
-export preprocess, test1
-
-# simple stub so earlier tests still pass
-test1() = 10
+export preprocess
 
 
+
+# ----------------------------------------------------------------------
+# helper: front half  (clean -> split -> tokenise)
+# ----------------------------------------------------------------------
 """
-    preprocess(text;
-               unit=:auto,            #  :auto | :word | :subword | :char
-               encoder=nothing,       #  Vocabulary        (word route)
-               subtok=nothing,        #  Symbol/String/BPETokeniser (subword)
-               char_eos=nothing,      #  "</w>" marker     (char route)
-               mode=:batch,           #  :tokens | :ids | :batch | :sentences
-               clean=true,
-               split_sentences=true) → …
+    _front_pass(text;
+                split_sentences       = true,
+                clean                 = true,
+                do_remove_zero_width  = false,
+                clean_kw...) → (sentences, tokens)
 
-* `unit=:auto`      — pick :subword if `subtok` is set, else :word if `encoder`
-                      is set, else :char if `char_eos` ≠ nothing, otherwise
-                      just return raw *tokens*.
-* `unit=:word`      — forces the word route (optionally pass `encoder`).
-* `unit=:subword`   — forces the sub-word route (optionally pass `subtok`;
-                      default is `:gpt2`).
-* `unit=:char`      — forces the character route.
+1. optionally strip zero–width code-points  
+2. sentence segmentation  
+3. per-sentence cleaning (broadcasts every `clean_kw...`)  
+4. word tokenisation **keeping punctuation** (`strip_punctuation = false`)
 """
-function preprocess(text::AbstractString;
-                    route = :subword,
-                    # --- granularity / routes --------------------------
-                    unit::Symbol        = :auto,
-                    encoder             = nothing,
-                    subtok              = nothing,
-                    char_eos            = nothing,
+function _front_pass(text::AbstractString;
+                     split_sentences::Bool      = true,
+                     clean::Bool                = true,
+                     do_remove_zero_width::Bool = false,
+                     clean_kw...)
 
-                    # --- sentence / token split ------------------------
-                    split_sentences::Bool = true,
+    # 0  ultra-fast sweep for ZWJ / ZWSP 
+    do_remove_zero_width && (text = Plumbing.strip_zero_width(text))
 
-                    # --- output shape ----------------------------------
-                    mode::Symbol        = :batch,
-                    # --- cleaning layer --------------------------------
-                    clean::Bool         = true,
-                    do_remove_zero_width::Bool = false,
-                    clean_kw...                     # <- must be last!
-                    )
-
-    #front half: clean -> sentence split -> tokenise
-    if do_remove_zero_width
-        text = Plumbing.strip_zero_width(text)
-    end
-
+    # 1  sentence boundaries
     sents = split_sentences ? Plumbing.split_sentences(text) : [text]
 
+    # 2 cleaning (broadcast)
     if clean
-        sents = Plumbing.clean_text.(sents; clean_kw...,
-                                    collapse_spaces = !do_remove_zero_width)
-        #(collapse_spaces = false); 
+        sents = Plumbing.clean_text.(sents;
+                                     clean_kw...,
+                                     collapse_spaces = !do_remove_zero_width)
     end
 
-    mode === :sentences && return sents
+    # 3 word/punct tokenisation  (punctuation kept)
+    toks = Plumbing.tokenize_batch(sents; strip_punctuation = false)
 
-    #word tokenisation
-    tokens = Plumbing.tokenize_batch(sents)
-    mode === :tokens && return tokens
-
-
-    #second half: 
-    if route === :none
-        return tokens                      # nothing to map → just tokens
-    elseif route === :word
-        encoder === nothing && (encoder = Vocabulary())  # build on-the-fly
-        ids = [utils.convert_tokens_to_ids(t, encoder) for t in tokens]
-        pad = encoder.unk_id
-
-    elseif route === :subword
-        if subtok === nothing         # implicit default
-            subtok = resolve_subtok(:gpt2)
-        elseif isa(subtok, Symbol)
-            subtok = resolve_subtok(subtok)
-        elseif isa(subtok, String)
-            subtok = utils.load_bpe(subtok)
-        end
-        ids = encode_batch(subtok, tokens)          # TODO: implement
-        pad = 0
-
-    elseif route === :char
-        ids = encode_char_batch(tokens; eos=char_eos)    # thin wrapper
-        pad = 0
-    else
-        error("unit must be :auto, :word, :subword or :char")
-    end
-
-    return mode === :ids ? ids : utils.pad_sequences(ids; pad_value=pad)
+    return sents, toks
 end
+
+_prepare_vocab(v, toks) = v === nothing ? _build_vocab(toks) : v
+
+_build_vocab(tok_batch) = begin
+    voc = utils.Vocabulary()
+    for t in tok_batch
+        utils.convert_tokens_to_ids(t, voc; add_new = true, update_counts = false)
+    end
+    voc
+end
+
+_prepare_subtok(s) = s === nothing      ? resolve_subtok(:gpt2) :
+                     isa(s, Symbol)     ? resolve_subtok(s)      :
+                     isa(s, String)     ? utils.load_bpe(s)      :
+                     s                   # already a BPETokeniser
+
+"""
+    preprocess(text; kwargs…) → ids / matrix / tokens 
+
+* `granularity = :word` (default) or `:subword` / `:char`
+* `output      = :batch` (default) or `:ids` / `:tokens` / `:sentences` / `:both`
+* sensible, no-hassle defaults power users may override through keywords.
+"""
+function preprocess(text::AbstractString;
+                    # granularity route
+                    granularity::Symbol         = :word,     # :word|:subword|:char
+                    word_vocab                  = nothing,   # Dict | Vector | Vocabulary
+                    subword_tokenizer           = nothing,   # Symbol or String
+                    char_eos                    = nothing,   # "</w>"
+
+                    # sentence split
+                    split_sentences::Bool       = true,
+
+                    # desired output
+                    output::Symbol              = :batch,    # :sentences | :tokens
+                                                               # :ids | :batch | :both
+                    # cleaning knobs
+                    clean::Bool                 = true,
+                    do_remove_zero_width::Bool  = false,
+                    clean_kw...                                # <- passthrough
+                   )
+
+    # front half 
+    sents, tokens = _front_pass(text;
+                                split_sentences,
+                                clean,
+                                do_remove_zero_width,
+                                clean_kw...)
+
+    output === :sentences && return sents
+    output === :tokens    && return tokens
+
+    # mapping to integer ids
+    ids       = Vector{Vector{Int}}()
+    pad_value = 0
+
+    if granularity === :word
+        vocab     = _prepare_vocab(word_vocab, tokens)
+        ids       = [utils.convert_tokens_to_ids(t, vocab) for t in tokens]
+        pad_value = vocab.unk_id
+
+    elseif granularity === :subword
+        tok       = _prepare_subtok(subword_tokenizer)
+        ids       = encode_batch(tok, tokens)           # TODO: implement
+        pad_value = 0
+
+    elseif granularity === :char
+        ids       = encode_char_batch(tokens; eos = char_eos)
+        pad_value = 0
+
+    else
+        error("granularity must be :word, :subword or :char (got $granularity)")
+    end
+
+    return output === :ids  ? ids :
+           output === :both ? (tokens, ids) :
+                              utils.pad_sequences(ids; pad_value = pad_value)
+end
+
+
+
 
 """
     resolve_subtok(sym::Symbol) → BPETokeniser
@@ -117,8 +150,46 @@ function resolve_subtok(sym::Symbol)
 end
 
 
-encode_batch(::utils.BPETokeniser, ::Any) =
-    error("encode_batch not implemented yet")
+"""
+    encode_char_batch(tok_batch; eos="</w>")
+Return a `Vector{Vector{Int}}` where every integer is the Unicode *code-point*
+of the corresponding character. **Very** small and fast; upgrade later if you
+need fancy grapheme handling.
+"""
+function encode_char_batch(tok_batch; eos::Union{String,Nothing}="</w>")
+    out = Vector{Vector{Int}}(undef, length(tok_batch))
+    for (i,sent) in pairs(tok_batch)
+        chars = Iterators.flatten(eos === nothing ?
+                                  sent :
+                                  (join(w, "") * eos for w in sent))
+        out[i] = Int.(codeunits(String(join(chars))))
+    end
+    out
+end
+
+"""
+    encode_batch(tok, tok_batch)  – BPE stub
+
+*For now* this feeds every **string token** through a naïve pair-merge loop
+so you can at least get deterministic ids.  Replace with a proper
+Byte-Pair-Encoding implementation when ready.
+"""
+function encode_batch(tok::utils.BPETokeniser, tok_batch)
+    merge2id = Dict{Tuple{String,String},Int}()
+    for (i,pair) in pairs(tok.merges); merge2id[pair] = i; end
+
+    function _encode(word)
+        # greedy left-to-right pair merge
+        pieces = collect(codeunits(word))
+        while length(pieces) >= 2
+            pair = (String(pieces[1]), String(pieces[2]))
+            haskey(merge2id, pair) || break
+            splice!(pieces, 1:2, UInt8[0xFF])   # merge symbol
+        end
+        Int.(pieces)
+    end
+    [vcat(_encode.(sentence)...) for sentence in tok_batch]
+end
 
 
 end  # module Pipeline

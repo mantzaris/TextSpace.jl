@@ -11,7 +11,7 @@ using .TextVectorization: pad_sequences
 
 
 export Vocabulary, convert_tokens_to_ids, convert_ids_to_tokens, 
-            pad_sequences
+            pad_sequences, testo
 
 
 # subwords and BPE
