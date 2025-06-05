@@ -33,7 +33,6 @@ end
     end
 end
 
-
 @testset "LoadBPE - deep-sanity of bundled artefacts" begin
     # GPT-2 (merges-only)
     gpt = load_bpe(TextSpace.resource("gpt2_merges.txt"))

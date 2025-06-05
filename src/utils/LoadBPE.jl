@@ -1,5 +1,5 @@
 module LoadBPE
-export BPETokeniser, load_bpe, testo
+export BPETokeniser, load_bpe
 
 import ...resource      # helper for bundled paths
 using JSON3

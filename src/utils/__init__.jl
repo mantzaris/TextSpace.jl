@@ -19,4 +19,8 @@ include("LoadBPE.jl")
 using .LoadBPE: BPETokeniser, load_bpe
 export BPETokeniser, load_bpe
 
+include("LearnBPE.jl")
+using .LearnBPE: learn_bpe, save_bpe
+export learn_bpe, save_bpe
+
 end #module
