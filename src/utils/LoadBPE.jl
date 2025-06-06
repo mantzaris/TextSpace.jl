@@ -173,32 +173,30 @@ end
 Greedy left-to-right application of the merge rules in `bpe.merges`.
 Returns the list of sub-tokens for one word (final `"</w>"` is kept).  """
 function _bpe_tokenize_word(word::String, bpe::BPETokeniser)
-    toks = [c for c in collect(word)]
-    push!(toks, "</w>")
+    # ✅ FIXED: Initialize with string characters
+    toks = [string(c) for c in collect(word)]  # Vector{String}
+    push!(toks, "</w>")                      
     
+    # Rank lookup
     rank = Dict{Tuple{String,String},Int}(p => i for (i,p) in enumerate(bpe.merges))
 
     while true
-        best_merge = nothing
+        best_idx = -1  #  -1 sentinel (not 0)
         best_rank = typemax(Int)
-        best_pos = 0
 
+        # Find lowest-rank adjacent pair
         @inbounds for i in 1:length(toks)-1
-            pair = (toks[i], toks[i+1])
-            r = get(rank, pair, nothing)
-            if r !== nothing && r < best_rank
-                best_rank = r
-                best_merge = pair
-                best_pos = i
-            end
+            r = get(rank, (toks[i], toks[i+1]), nothing)
+            (r !== nothing && r < best_rank) && (best_rank, best_idx = r, i)
         end
 
-        best_merge === nothing && break   # ✅ Clear termination condition
-        toks[best_pos] = toks[best_pos] * toks[best_pos+1]
-        deleteat!(toks, best_pos+1)
+        best_idx == -1 && break  #check -1, not 0
+        toks[best_idx] = toks[best_idx] * toks[best_idx+1]
+        deleteat!(toks, best_idx+1)
     end
     return toks
 end
+
 
 
 """

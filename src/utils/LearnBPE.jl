@@ -16,13 +16,11 @@ module LearnBPE
 using ...Plumbing
 using JSON3
 
+import ..LoadBPE: BPETokeniser
+
 export BPETokeniser, learn_bpe, save_bpe, load_bpe
 
 
-struct BPETokeniser
-    merges :: Vector{Tuple{String,String}}
-    vocab  :: Union{Dict{String,Int},Nothing}
-end
 
 """
     learn_bpe(corpus; vocab_size=10000, min_frequency=2, special_tokens=["<unk>", "<s>", "</s>", "<pad>"])
@@ -103,38 +101,8 @@ function learn_bpe(corpus;
     return BPETokeniser(merges, final_vocab)
 end
 
-"""
-    save_bpe(tokenizer::BPETokeniser, filepath::String; format::String="json")
 
-Save a BPE tokenizer to a file.
 
-# Arguments
-- `tokenizer::BPETokeniser`: The tokenizer to save
-- `filepath::String`: Path where to save the tokenizer
-- `format::String="json"`: Output format ("json" or "txt")
-
-# Examples
-```julia
-tokenizer = learn_bpe(corpus, vocab_size=5000)
-
-# Save as JSON (recommended)
-save_bpe(tokenizer, "my_tokenizer.json")
-
-# Save as text files (separate merges and vocab)
-save_bpe(tokenizer, "my_tokenizer", format="txt")
-```
-"""
-function save_bpe(tokenizer::BPETokeniser, filepath::String; format::String="json")
-    if format == "json"
-        _save_bpe_json(tokenizer, filepath)
-    elseif format == "txt"
-        _save_bpe_txt(tokenizer, filepath)
-    else
-        error("Unsupported format: $format. Use 'json' or 'txt'")
-    end
-    
-    println("Tokenizer saved to: $filepath")
-end
 
 """
     load_bpe(filepath::String) -> BPETokeniser
@@ -411,7 +379,7 @@ function save_bpe(tokenizer::BPETokeniser,
         _save_bpe_txt(tokenizer, stem)           # produces   stem.merges.txt + stem.vocab.json
     end
 
-    fmt ∈ ("json", "txt", "both") ||                       # final guard
+    fmt in ("json", "txt", "both") ||                       # final guard
         error("Unsupported format '$(format)'. Choose :json, :txt or :both")
 end
 

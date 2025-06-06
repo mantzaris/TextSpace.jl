@@ -15,9 +15,7 @@ export preprocess,
        preprocess_subword_learn
 
 
-# ----------------------------------------------------------------------
 # helper: front half  (clean -> split -> tokenise)
-# ----------------------------------------------------------------------
 """
     _front_pass(text;
                 split_sentences       = true,
@@ -25,7 +23,7 @@ export preprocess,
                 do_remove_zero_width  = false,
                 clean_kw...) → (sentences, tokens)
 
-1. optionally strip zero–width code-points
+1. optionally strip zero-width code-points
 2. sentence segmentation  
 3. per-sentence cleaning (broadcasts every `clean_kw...`)  
 4. word tokenisation **keeping punctuation** (`strip_punctuation = false`)
@@ -119,11 +117,14 @@ function preprocess(text::AbstractString;             # unchanged kwargs …
         pad_value    = 0
 
     elseif granularity === :char
-        vocab        = char_vocab === nothing ? _build_char_vocab(tokens)
-                                          : char_vocab
-        ids          = utils.encode_char_batch(tokens, vocab; eos = char_eos)
-        encoder_ref  = vocab
-        pad_value    = vocab.unk_id
+        vocab = char_vocab === nothing ? _build_char_vocab(tokens) : char_vocab
+        padded_matrix = utils.encode_char_batch(tokens, vocab; eos = char_eos)
+        
+        ids = [padded_matrix[:, i] for i in 1:size(padded_matrix, 2)] #just works...
+        
+        encoder_ref = vocab
+        pad_value = vocab.unk_id
+
 
     else
         error("granularity must be :word, :subword or :char (got $granularity)")
@@ -142,7 +143,7 @@ preprocess_word(text; kw...)   =
 preprocess_char(text; kw...)   =
     preprocess(text; granularity = :char,   output = :both, kw...)
 
-preprocess_subword(text; subtok = nothing; kw...) =
+preprocess_subword(text; subtok = nothing, kw...) =
     preprocess(text; granularity = :subword,
                subword_tokenizer = subtok,  output = :both, kw...)
 
@@ -152,23 +153,22 @@ Convenience wrapper: first *learn* a BPE on `corpus` (vector of docs or string),
 then immediately encode the same corpus with that freshly-trained model.
 Returns `(tokens, ids, my_bpe)`.
 """
-function preprocess_subword_learn(corpus;
+function preprocess_subword_learn(corpus::Vector{String}; 
                                   vocab_size = 10_000,
                                   min_frequency = 2,
-                                  special_tokens = ["<unk>","<pad>"],
+                                  special_tokens = ["<unk>"],
                                   output::Symbol = :both,
                                   kw...)
     bpe = LBPE.learn_bpe(corpus;
                          vocab_size = vocab_size,
                          min_frequency = min_frequency,
                          special_tokens = special_tokens)
-    return preprocess(corpus;
-                      granularity = :subword,
-                      subword_tokenizer = bpe,
-                      output = output,
-                      kw...)
-end
 
+    combined_text = join(corpus, " ")
+
+    return preprocess(combined_text; granularity=:subword, 
+                      subword_tokenizer=bpe, output=output, kw...)
+end
 
 
 
@@ -176,11 +176,18 @@ end
 
 _build_char_vocab(tokens) = begin
     voc = utils.Vocabulary()
+    
+    # Process characters from words
     for sent in tokens, word in sent, ch in String(word)
-        utils.convert_tokens_to_ids([ch], voc; add_new=true, update_counts=false)
+        utils.convert_tokens_to_ids([string(ch)], voc; add_new=true, update_counts=false)
     end
+    
+    # ✅ ADD: Include EOS token in vocabulary
+    utils.convert_tokens_to_ids(["</w>"], voc; add_new=true, update_counts=false)
+    
     voc
 end
+
 
 
 

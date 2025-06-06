@@ -1,7 +1,11 @@
 module CharTokeniser
 
-import ..Plumbing: tokenize_char
+
+import ..VocabularyCore: Vocabulary 
+
+import ...Plumbing: tokenize_char
 import ..TextVectorization: pad_sequences
+
 
 export chars_to_ids, encode_char_batch
 
@@ -68,13 +72,29 @@ function encode_char_batch(tok_batch::Vector{Vector{String}},
                            eos::Union{String,Nothing}="</w>",
                            pad_value::Int = vocab.unk_id)
 
-    char_seqs = [join.(tok_batch[i], "") * (eos === nothing ? "" : eos)
-                 for i in eachindex(tok_batch)]
-
-    id_seqs   = [chars_to_ids(string.(collect(s)), vocab; add_new=false) for s in char_seqs]
+    # ✅ FIXED: Proper type declaration
+    id_seqs = Vector{Vector{Int}}()
+    
+    for sentence_tokens in tok_batch
+        # Join words in sentence
+        sentence_str = join(sentence_tokens, "")
+        
+        # Split into individual characters
+        chars = [string(ch) for ch in sentence_str]
+        
+        # Add EOS as single token
+        if eos !== nothing
+            push!(chars, eos)
+        end
+        
+        # Convert to IDs
+        ids = chars_to_ids(chars, vocab; add_new=false)
+        push!(id_seqs, ids)
+    end
 
     return pad_sequences(id_seqs; pad_value=pad_value)
 end
+
 
 
 end # module
