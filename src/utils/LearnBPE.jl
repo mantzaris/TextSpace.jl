@@ -179,9 +179,8 @@ end
 #     end
 # end
 
-# ============================================================================
 # Internal Helper Functions
-# ============================================================================
+
 
 """
     _preprocess_corpus(corpus::Vector{String}) -> Dict{Vector{String}, Int}
@@ -393,9 +392,8 @@ function _create_final_vocabulary(vocab::Set{String}, merges::Vector{Tuple{Strin
     return final_vocab
 end
 
-# ============================================================================
 # Save/Load Helper Functions
-# ============================================================================
+
 function save_bpe(tokenizer::BPETokeniser,
                   filepath::String;
                   format::Union{String,Symbol} = "json")
@@ -414,7 +412,7 @@ function save_bpe(tokenizer::BPETokeniser,
     end
 
     fmt ∈ ("json", "txt", "both") ||                       # final guard
-        error("Unsupported format ‘$(format)’. Choose :json, :txt or :both")
+        error("Unsupported format '$(format)'. Choose :json, :txt or :both")
 end
 
 
@@ -456,11 +454,11 @@ end
 Save tokenizer to text format (separate merges and vocab files).
 """
 function _save_bpe_txt(tokenizer::BPETokeniser, stem::AbstractString)
-    # GPT-2 convention: “_merges.txt”, optional “_vocab.json”
+    # GPT-2 convention: '_merges.txt', optional '_vocab.json'
     merges_path = stem * "_merges.txt"
     vocab_path  = stem * "_vocab.json"
 
-    # ── 1. merges.txt ───────────────────────────────────────────────
+    # merges.txt 
     open(merges_path, "w") do io
         println(io, "#version: 1.0")
         for (l,r) in tokenizer.merges
@@ -468,7 +466,7 @@ function _save_bpe_txt(tokenizer::BPETokeniser, stem::AbstractString)
         end
     end
 
-    # ── 2. vocab.json (only if present) ─────────────────────────────
+    # vocab.json (only if present) 
     if tokenizer.vocab !== nothing
         open(vocab_path, "w") do io
             JSON3.pretty(io, tokenizer.vocab)
@@ -484,7 +482,7 @@ Load tokenizer from JSON format.
 function _load_bpe_json(filepath::String)
     data = JSON3.read(read(filepath, String))
     
-    # Extract merges
+    #extract merges
     merges = Vector{Tuple{String,String}}()
     if haskey(data, :model) && haskey(data[:model], :merges)
         for merge_pair in data[:model][:merges]
@@ -492,7 +490,7 @@ function _load_bpe_json(filepath::String)
         end
     end
     
-    # Extract vocabulary
+    #extract vocabulary
     vocab = nothing
     if haskey(data, :model) && haskey(data[:model], :vocab) && data[:model][:vocab] !== nothing
         vocab = Dict{String,Int}(String(k) => Int(v) for (k,v) in pairs(data[:model][:vocab]))
@@ -513,7 +511,7 @@ function _load_bpe_txt(stem::AbstractString)
     elseif isfile(stem * ".merges.txt")
         stem * ".merges.txt"
     else
-        error("No merges file found for tokenizer stem “$(stem)”")
+        error("No merges file found for tokenizer stem '$(stem)'")
     end
 
     vocab_file  =  isfile(stem * "_vocab.json")  ? stem * "_vocab.json" :

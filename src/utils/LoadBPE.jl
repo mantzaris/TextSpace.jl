@@ -1,9 +1,12 @@
 module LoadBPE
-export BPETokeniser, load_bpe
 
 import ...resource      # helper for bundled paths
+import ..LearnBPE
+
 using JSON3
 using Base: basename
+
+export BPETokeniser, bpe_encode_batch, load_bpe
 
 
 struct BPETokeniser
@@ -40,7 +43,7 @@ function _read_merges(txtfile)
             # Take only the first two parts for the merge
             push!(merges, (parts[1], parts[2]))
         end
-        # Skip lines that don't have at least 2 parts
+        #skipping lines that don't have at least 2 parts
     end
     
     return merges
@@ -49,7 +52,7 @@ end
 # Fixed version of _to_vocab that handles different JSON structures
 function _to_vocab(obj)
     if isa(obj, AbstractDict)
-        # Handle regular dict format (like RoBERTa-base_vocab.json)
+        # handle regular dict format (like RoBERTa-base_vocab.json)
         return Dict{String,Int}(String(k) => Int(v) for (k,v) in pairs(obj))
     else
         error("Unsupported vocab format: expected Dict, got $(typeof(obj))")
@@ -87,7 +90,7 @@ function _to_str_int(obj)
     end
 end
 
-# helper - keep only the first two items of every merge rule
+# helper!
 _normalise_merges(arr) =
     Tuple{String,String}.( (String(r[1]), String(r[2])) for r in arr )
 
@@ -113,7 +116,7 @@ function load_bpe(spec::AbstractString)::BPETokeniser
 
     # user-supplied file path
     elseif isfile(spec)
-        return _load_external_bpe(spec)   # as in your current file
+        return _load_external_bpe(spec) 
     else
         error("Unknown BPE spec '$(spec)'.  Use one of the bundled names or an existing file.")
     end
@@ -161,6 +164,75 @@ function _load_external_bpe(path::AbstractString)
     end
     error("Could not interpret external BPE file '$(path)'")
 end
+
+
+
+"""
+    _bpe_tokenize_word(word, bpe) -> Vector{String}
+
+Greedy left-to-right application of the merge rules in `bpe.merges`.
+Returns the list of sub-tokens for one word (final `"</w>"` is kept).  """
+function _bpe_tokenize_word(word::String, bpe::BPETokeniser)
+    toks = [c for c in collect(word)]
+    push!(toks, "</w>")
+    
+    rank = Dict{Tuple{String,String},Int}(p => i for (i,p) in enumerate(bpe.merges))
+
+    while true
+        best_merge = nothing
+        best_rank = typemax(Int)
+        best_pos = 0
+
+        @inbounds for i in 1:length(toks)-1
+            pair = (toks[i], toks[i+1])
+            r = get(rank, pair, nothing)
+            if r !== nothing && r < best_rank
+                best_rank = r
+                best_merge = pair
+                best_pos = i
+            end
+        end
+
+        best_merge === nothing && break   # ✅ Clear termination condition
+        toks[best_pos] = toks[best_pos] * toks[best_pos+1]
+        deleteat!(toks, best_pos+1)
+    end
+    return toks
+end
+
+
+"""
+    _tokens_to_ids(toks, bpe) -> Vector{Int}
+
+Map sub-tokens to integer IDs.
+
+* If `bpe.vocab` is present, look them up there (unknown → -1).
+* If no vocab is stored (e.g. GPT-2), fall back to a stable hash. """
+@inline _tok_id(tok, vocab) = get(vocab, tok, -1)
+
+function _tokens_to_ids(toks::Vector{String}, bpe::BPETokeniser)
+    if bpe.vocab === nothing
+        return [hash(tok)%typemax(Int) for tok in toks]   # cheap fallback
+    else
+        return [_tok_id(tok, bpe.vocab) for tok in toks]
+    end
+end
+
+
+"""
+    bpe_encode_batch(bpe, tokens_batch) → Vector{Vector{Int}}
+
+Encode a batch of sentences (each a `Vector{String}` of *space-split*
+word tokens) with the merge table + vocabulary stored in `bpe`.  The
+result for every sentence is a flat `Vector{Int}` ready for padding /
+feeding to a model.  """
+function bpe_encode_batch(bpe::BPETokeniser,
+                          batch::Vector{Vector{String}})
+    return [vcat( (_tokens_to_ids(_bpe_tokenize_word(w, bpe), bpe)
+                   for w in sent)... ) for sent in batch]
+end
+
+
 
 end # module
 

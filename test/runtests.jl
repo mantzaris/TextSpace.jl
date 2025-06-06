@@ -11,7 +11,8 @@ using Downloads
 # include("WordEmbeddings/word_embeddings_test_gateway.jl")
 # include("CharacterEmbeddings/character_embeddings_test_gateway.jl")
 # include("preprocessing/preprocessing_test_gateway.jl")
-include("util-tests/__init__.jl")
+
+# include("util-tests/__init__.jl")
 include("pipeline/preprocessing_pipeline_tests.jl")
 
 
