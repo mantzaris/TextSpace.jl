@@ -1,6 +1,3 @@
-include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "SentenceProcessing.jl"))
-
-
 @testset "split_sentences" begin
     txt = "Dr. Smith went to Washington.  It was rainy!  Was it fun?  Yes."
     sents = split_sentences(txt)

@@ -1,25 +1,21 @@
-using TextSpace
 using Test
-
+using TextSpace
 using Random
+using Unicode
 using Downloads 
 
-# include(joinpath(@__DIR__, "..", "src", "preprocessing", "Vocabulary.jl"))
-# include(joinpath(@__DIR__, "..", "src", "preprocessing", "SubwordProcessing.jl"))
+@testset "TextSpace.jl Test Suite" begin
+    @testset "Plumbing" begin
+        include("preprocessing/__init__.jl")
+    end
 
-# include("SubwordEmbeddings/subword_embeddings_test_gateway.jl")
-# include("WordEmbeddings/word_embeddings_test_gateway.jl")
-# include("CharacterEmbeddings/character_embeddings_test_gateway.jl")
-# include("preprocessing/preprocessing_test_gateway.jl")
+    @testset "Pipelines" begin
+        include("pipeline/preprocessing_pipeline_tests.jl")
+    end
 
-# include("util-tests/__init__.jl")
-include("pipeline/preprocessing_pipeline_tests.jl")
+    @testset "Basic Tests" begin
+        @test true
+    end
 
-
-
-@testset "basic root test" begin
-    # Test 1: Default behavior (no punctuation or emoji removal)
-    text1 = "Hello, World!"
-    #only lowercasing and whitespace normalization occur.
-    @test text1 == "Hello, World!"
+    # Future testsets for embeddings and utils can follow the same structure
 end

@@ -1,6 +1,4 @@
-include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "ParagraphProcessing.jl"))
-
-const PP = TextSpace.Preprocessing
+const PP = TextSpace.Plumbing
 
 
 @testset "unwrap_lines" begin

@@ -29,10 +29,11 @@ resource(name) = joinpath(@__DIR__, "resources", name) # e.g. "gpt2_merges.txt"
 include("preprocessing/__init__.jl")
 include("utils/__init__.jl") 
 
+
 include(joinpath(@__DIR__, "pipeline", "Pipeline.jl"))
 # #now use
+@reexport using .Plumbing
 @reexport using .Pipeline
-
 # high-level embeddings
 # include(joinpath(@__DIR__, "embeddings", "CharacterEmbeddings.jl"))
 # @reexport using .CharacterEmbeddings 
