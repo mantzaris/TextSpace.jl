@@ -106,18 +106,12 @@ Strip all combining diacritical marks (Unicode category *Mn*) from `text`
 while leaving base characters intact.  Works on Julia 1.6 - 1.11.
 """
 function remove_accents(text::AbstractString)::String
+    # normalize to NFD to separate characters from their accents
     nfd = Unicode.normalize(text, :NFD)
-
-    if isdefined(Unicode, :combining_class)      # >= 1.10 fast path
-        io = IOBuffer()
-        @inbounds for c in nfd
-            Unicode.combining_class(c) == 0 && write(io, c)
-        end
-        return Unicode.normalize(String(take!(io)), :NFC)
-    else                                          # 1.6 - 1.9 fallback
-        stripped = replace(nfd, r"\p{Mn}" => "")
-        return Unicode.normalize(stripped, :NFC)
-    end
+    # remove all combining diacritical marks using regex
+    stripped = replace(nfd, r"\p{Mn}" => "")
+    # normalize back to NFC for canonical representation
+    return Unicode.normalize(stripped, :NFC)
 end
 
 

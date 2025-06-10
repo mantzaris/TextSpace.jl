@@ -1,6 +1,3 @@
-include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "CharProcessing.jl"))
-
-
 @testset "tokenize_char" begin
     txt = "Café 😊"
 

@@ -1,8 +1,3 @@
-include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "CleanText.jl"))
-
-using Random, Unicode
-
-
 @testset "remove_punctuation" begin
     txt = "Hello, world! (yes) - test."
     @test remove_punctuation(txt) == "Hello world yes  test"

@@ -1,6 +1,3 @@
-include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "TextNormalization.jl"))
-
-
 @testset "normalize_unicode" begin
     decomposed = "Cafe\u0301"                 # "Café" (e + COMBINING ACUTE)
     composed   = "Café"                       # NFC form

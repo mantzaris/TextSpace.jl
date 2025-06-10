@@ -1,5 +1,3 @@
-
-
 @testset "basic_tokenize" begin
     txt = "Hello,  World!\n"
 
