@@ -95,10 +95,10 @@ end
 end
 
 
-#@testset "remove_accents" begin
-#    accented = "Café naïve fiancé déjà vu"
-#    @test remove_accents(accented) == "Cafe naive fiance deja vu"
-#end
+@testset "remove_accents" begin
+    accented = "Café naïve fiancé déjà vu"
+    @test remove_accents(accented) == "Cafe naive fiance deja vu"
+end
 
 
 @testset "remove_emojis - curated" begin

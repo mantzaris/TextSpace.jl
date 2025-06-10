@@ -17,5 +17,5 @@ using Downloads
         @test true
     end
 
-    # Future testsets for embeddings and utils can follow the same structure
+    # future testsets for embeddings and utils can follow the same structure
 end
