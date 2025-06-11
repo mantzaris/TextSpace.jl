@@ -1,4 +1,4 @@
-module CharTokeniser
+module CharTokenizer
 
 
 import ..VocabularyCore: Vocabulary 
@@ -72,7 +72,7 @@ function encode_char_batch(tok_batch::Vector{Vector{String}},
                            eos::Union{String,Nothing}="</w>",
                            pad_value::Int = vocab.unk_id)
 
-    # ✅ FIXED: Proper type declaration
+    #type declaration
     id_seqs = Vector{Vector{Int}}()
     
     for sentence_tokens in tok_batch

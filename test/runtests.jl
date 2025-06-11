@@ -12,14 +12,12 @@ using Downloads
 # include("CharacterEmbeddings/character_embeddings_test_gateway.jl")
 # include("preprocessing/preprocessing_test_gateway.jl")
 
-# include("util-tests/__init__.jl")
-include("pipeline/preprocessing_pipeline_tests.jl")
+
+include("util-tests/__init__.jl")
+include("pipeline/__init__.jl")
 
 
-
-@testset "basic root test" begin
-    # Test 1: Default behavior (no punctuation or emoji removal)
+@testset "root test Hello Word!" begin
     text1 = "Hello, World!"
-    #only lowercasing and whitespace normalization occur.
     @test text1 == "Hello, World!"
 end
