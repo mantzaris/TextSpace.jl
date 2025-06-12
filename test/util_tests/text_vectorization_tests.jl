@@ -1,4 +1,3 @@
-include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "TextVectorization.jl"))
 
 
 @testset "pad_sequences" begin

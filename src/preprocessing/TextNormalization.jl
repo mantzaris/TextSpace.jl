@@ -1,4 +1,3 @@
-#(future) text normalization (add: accent stripping, stemming, lemmatization)
 
 """
     normalize_unicode(text; form = :NFC) -> String

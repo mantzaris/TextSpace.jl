@@ -1,5 +1,3 @@
-using TextSpace
-using TextSpace.utils: load_bpe, BPETokeniser      # the API under test
 
 @testset "LoadBPE - merges-only artefact" begin
     gpt_path = TextSpace.resource("gpt2_merges.txt")

@@ -1,9 +1,3 @@
-using TextSpace
-using TextSpace.utils
-using TextSpace.utils.VocabularyCore
-using TextSpace.utils.CharTokenizer
-using TextSpace.utils.CharTokenizer: chars_to_ids, encode_char_batch
-using TextSpace.utils.VocabularyCore: Vocabulary
 
 
 function make_vocab()

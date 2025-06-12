@@ -1,6 +1,4 @@
-using TextSpace
-using TextSpace.utils: learn_bpe, save_bpe, load_bpe, BPETokeniser      # the API under test
-using UUIDs
+
 
 const LBPE = TextSpace.utils.LearnBPE   # module path
 const BPET = LBPE.BPETokeniser          # handy alias

@@ -5,6 +5,7 @@ using LinearAlgebra
 using Statistics
 using Random
 
+export pad_sequences
 
 """
     pad_sequences(seqs; maxlen = nothing, pad_value = 0, trunc = :post)
@@ -93,7 +94,7 @@ end
     tfidf_matrix(docs, vocab_size; smooth_idf = 1.0) -> Matrix{Float64}
 
 Return a column-major TF-IDF matrix.  
-`smooth_idf` ≥ 0 controls additive smoothing (set to 0 for raw IDF).
+`smooth_idf` >= 0 controls additive smoothing (set to 0 for raw IDF).
 """
 function tfidf_matrix(docs::AbstractVector{<:AbstractVector{<:Integer}},
                       vocab_size::Integer;
