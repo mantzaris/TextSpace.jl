@@ -1,6 +1,4 @@
 
-using Unicode  
-import Base: isempty
 
 
 if !@isdefined(_PUNCT_CHARS)

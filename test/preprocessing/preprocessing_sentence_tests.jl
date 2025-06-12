@@ -1,4 +1,3 @@
-include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "SentenceProcessing.jl"))
 
 
 @testset "split_sentences" begin
@@ -104,7 +103,7 @@ end
     s = split_sentences(raw)
 
     # current implementation yields 5; accept anything reasonably split
-    @test length(s) ≥ 5
+    @test length(s) >= 5
 
     # helper to strip zero-width chars before comparison
     strip_zws(str) = replace(str, r"[\u200B\u200D\u2060]" => "")

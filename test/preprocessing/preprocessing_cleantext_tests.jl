@@ -1,6 +1,3 @@
-include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "CleanText.jl"))
-
-
 
 
 @testset "remove_punctuation" begin

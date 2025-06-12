@@ -1,12 +1,14 @@
 module Plumbing
 
+using Unicode
+import Base: isempty
 
-include("CleanText.jl")
-include("TextNormalization.jl")
-include("Tokenization.jl")
-include("CharProcessing.jl")
-include("SentenceProcessing.jl")
-include("ParagraphProcessing.jl")
+include("clean_text.jl")
+include("text_normalization.jl")
+include("tokenization.jl")
+include("char_processing.jl")
+include("sentence_processing.jl")
+include("paragraph_processing.jl")
 
 
 export clean_text, strip_zero_width, normalize_whitespace,

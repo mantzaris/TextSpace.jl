@@ -3,10 +3,10 @@ module Pipeline
 import ..TextSpace: resource
 import ..Plumbing
 using ..Plumbing: clean_text
-import ..utils as utils
+import ..Utils as Utils
 
-const  LBPE = utils.LearnBPE
-const  BPE  = utils.LoadBPE
+const  LBPE = Utils.LearnBPE
+const  BPE  = Utils.LoadBPE
 
 export preprocess,
        preprocess_word,
@@ -56,18 +56,18 @@ end
 _prepare_vocab(v, toks) = v === nothing ? _build_vocab(toks) : v
 
 _build_vocab(tok_batch) = begin
-    voc = utils.Vocabulary()
+    voc = Utils.Vocabulary()
     for t in tok_batch
-        utils.convert_tokens_to_ids(t, voc; add_new = true, update_counts = false)
+        Utils.convert_tokens_to_ids(t, voc; add_new = true, update_counts = false)
     end
     voc
 end
 
 """
-    _get_bpe(spec) -> utils.LoadBPE.BPETokeniser
+    _get_bpe(spec) -> Utils.LoadBPE.BPETokeniser
 
-* `spec isa utils.LoadBPE.BPETokeniser` → returned unchanged  
-* `spec isa Symbol  | String`           → passed to `utils.load_bpe`  
+* `spec isa Utils.LoadBPE.BPETokeniser` → returned unchanged  
+* `spec isa Symbol  | String`           → passed to `Utils.load_bpe`  
   (bundled keyword or file path)  
 * `spec === nothing`                    → default to bundled GPT-2 merges
 """
@@ -75,9 +75,9 @@ function _get_bpe(spec)
     if spec isa BPE.BPETokeniser || spec isa LBPE.BPETokeniser
         return spec
     elseif spec === nothing
-        return utils.load_bpe(resource("gpt2_merges.txt"))
+        return Utils.load_bpe(resource("gpt2_merges.txt"))
     else
-        return utils.load_bpe(String(spec))
+        return Utils.load_bpe(String(spec))
     end
 end
 
@@ -106,19 +106,19 @@ function preprocess(text::AbstractString;             # unchanged kwargs …
 
     if granularity === :word
         vocab        = _prepare_vocab(word_vocab, tokens)
-        ids          = [utils.convert_tokens_to_ids(t, vocab) for t in tokens]
+        ids          = [Utils.convert_tokens_to_ids(t, vocab) for t in tokens]
         encoder_ref  = vocab
         pad_value    = vocab.unk_id
 
     elseif granularity === :subword
         bpe          = _get_bpe(subword_tokenizer)
-        ids          = utils.bpe_encode_batch(bpe, tokens)
+        ids          = Utils.bpe_encode_batch(bpe, tokens)
         encoder_ref  = bpe
         pad_value    = 0
 
     elseif granularity === :char
         vocab = char_vocab === nothing ? _build_char_vocab(tokens) : char_vocab
-        padded_matrix = utils.encode_char_batch(tokens, vocab; eos = char_eos)
+        padded_matrix = Utils.encode_char_batch(tokens, vocab; eos = char_eos)
         
         ids = [padded_matrix[:, i] for i in 1:size(padded_matrix, 2)] #just works...
         
@@ -132,7 +132,7 @@ function preprocess(text::AbstractString;             # unchanged kwargs …
 
     return output === :ids    ? (ids,  encoder_ref) :
            output === :both   ? (tokens, ids, encoder_ref) :
-                                (utils.pad_sequences(ids; pad_value = pad_value),
+                                (Utils.pad_sequences(ids; pad_value = pad_value),
                                  encoder_ref)
 end
 
@@ -175,15 +175,15 @@ end
 
 
 _build_char_vocab(tokens) = begin
-    voc = utils.Vocabulary()
+    voc = Utils.Vocabulary()
     
     # Process characters from words
     for sent in tokens, word in sent, ch in String(word)
-        utils.convert_tokens_to_ids([string(ch)], voc; add_new=true, update_counts=false)
+        Utils.convert_tokens_to_ids([string(ch)], voc; add_new=true, update_counts=false)
     end
     
-    # ✅ ADD: Include EOS token in vocabulary
-    utils.convert_tokens_to_ids(["</w>"], voc; add_new=true, update_counts=false)
+    # include EOS token in vocabulary
+    Utils.convert_tokens_to_ids(["</w>"], voc; add_new=true, update_counts=false)
     
     voc
 end
@@ -197,7 +197,7 @@ end  # module Pipeline
 
 # txt = "Hug my dog. Hug my cat."
 
-# # word route – build vocab automatically:
+# # word route - build vocab automatically:
 # wp = word_pre(txt)
 # wp.ids        # → Matrix{Int}
 # wp.encoder    # → Vocabulary to serialise

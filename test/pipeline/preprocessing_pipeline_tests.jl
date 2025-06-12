@@ -1,8 +1,8 @@
 using Test
 using TextSpace
 using TextSpace.Plumbing: tokenize, split_sentences, tokenize_batch
-using TextSpace.utils: Vocabulary, convert_tokens_to_ids
-import TextSpace.utils as utils    # for load_bpe
+using TextSpace.Utils: Vocabulary, convert_tokens_to_ids
+import TextSpace.Utils as Utils    # for load_bpe
 import TextSpace.Pipeline
 import TextSpace.Plumbing as Plumbing
 
@@ -23,7 +23,7 @@ end
     @test length(tok) == 1                     
     @test tok[1] == ["hug", "my", "dog", "!"] 
     @test length(ids) == length(tok)           
-    @test voc isa TextSpace.utils.Vocabulary
+    @test voc isa TextSpace.Utils.Vocabulary
     @test all(isa.(ids[1], Int))          
 end
 
@@ -71,7 +71,7 @@ end
     
     #Test actual function
     char_vocab = Pipeline._build_char_vocab(tokens)
-    result = utils.encode_char_batch(tokens, char_vocab; eos="</w>")
+    result = Utils.encode_char_batch(tokens, char_vocab; eos="</w>")
     println("  encode_char_batch result: $result")
     println("  Result size: $(size(result))")
     
@@ -108,7 +108,7 @@ end
     text = "Hello world"
     tok, ids, bpe = Pipeline.preprocess_subword(text)  # default GPT-2 merges
 
-    @test bpe isa TextSpace.utils.LoadBPE.BPETokeniser
+    @test bpe isa TextSpace.Utils.LoadBPE.BPETokeniser
     @test !isempty(bpe.merges)
     @test length(ids) == 1 && !isempty(ids[1])
 end
@@ -121,7 +121,7 @@ end
                                                          vocab_size=50,
                                                          min_frequency=1)
 
-    @test my_bpe isa TextSpace.utils.LearnBPE.BPETokeniser
+    @test my_bpe isa TextSpace.Utils.LearnBPE.BPETokeniser
     @test !isempty(my_bpe.merges)
     # Encoder works on unseen text with the same model
     new_ids, enc = Pipeline.preprocess("hug dog";
@@ -145,12 +145,12 @@ end
         
 #         @test isa(tokens, Vector{Vector{String}})
 #         @test isa(ids, Vector{Vector{Int}})
-#         @test isa(vocab, utils.Vocabulary)
+#         @test isa(vocab, Utils.Vocabulary)
 #         @test length(tokens) == length(ids)
 #         @test length(tokens) > 0
 #         @test all(length(sent) > 0 for sent in tokens)
         
-#         println("✅ Word preprocessing: $(length(tokens)) sentences, vocab size: $(length(vocab.id2token))")
+#         println("word preprocessing: $(length(tokens)) sentences, vocab size: $(length(vocab.id2token))")
 #     end
     
 #     @testset "Character-Level Processing" begin
@@ -161,7 +161,7 @@ end
         
 #         @test isa(tokens, Vector{Vector{String}})
 #         @test isa(ids, Vector{Vector{Int}})
-#         @test isa(vocab, utils.Vocabulary)
+#         @test isa(vocab, Utils.Vocabulary)
 #         @test length(tokens) == length(ids)
         
 #         # Check that character vocab contains expected characters
@@ -181,7 +181,7 @@ end
         
 #         @test isa(tokens, Vector{Vector{String}})
 #         @test isa(ids, Vector{Vector{Int}})
-#         @test isa(bpe, Union{utils.LoadBPE.BPETokeniser, utils.LearnBPE.BPETokeniser})
+#         @test isa(bpe, Union{Utils.LoadBPE.BPETokeniser, Utils.LearnBPE.BPETokeniser})
 #         @test length(tokens) == length(ids)
 #         @test length(tokens) > 0
         
@@ -201,7 +201,7 @@ end
         
 #         @test isa(tokens, Vector{Vector{String}})
 #         @test isa(ids, Vector{Vector{Int}})
-#         @test isa(learned_bpe, utils.LearnBPE.BPETokeniser)
+#         @test isa(learned_bpe, Utils.LearnBPE.BPETokeniser)
 #         @test length(tokens) == length(corpus)
 #         @test length(learned_bpe.merges) >= 0
 #         @test learned_bpe.vocab !== nothing
@@ -220,20 +220,20 @@ end
 #         # batch format: (padded_matrix, encoder)
 #         @test length(batch_result) == 2
 #         @test isa(batch_result[1], Vector{Vector{Int}})
-#         @test isa(batch_result[2], utils.Vocabulary)
+#         @test isa(batch_result[2], Utils.Vocabulary)
         
 #         # ids format: (ids, encoder)
 #         @test length(ids_result) == 2
 #         @test isa(ids_result[1], Vector{Vector{Int}})
-#         @test isa(ids_result[2], utils.Vocabulary)
+#         @test isa(ids_result[2], Utils.Vocabulary)
         
 #         # both format: (tokens, ids, encoder)
 #         @test length(both_result) == 3
 #         @test isa(both_result[1], Vector{Vector{String}})
 #         @test isa(both_result[2], Vector{Vector{Int}})
-#         @test isa(both_result[3], utils.Vocabulary)
+#         @test isa(both_result[3], Utils.Vocabulary)
         
-#         println("✅ Output formats: batch, ids, both all working")
+#         println("output formats: batch, ids, both all working")
 #     end
     
 #     @testset "Text Processing Options" begin

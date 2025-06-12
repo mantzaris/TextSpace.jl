@@ -1,6 +1,4 @@
 
-using Unicode
-
 
 function tokenize_char(text::AbstractString;
                        normalize::Bool      = true,

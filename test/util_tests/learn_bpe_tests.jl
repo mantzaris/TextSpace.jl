@@ -1,6 +1,6 @@
 
 
-const LBPE = TextSpace.utils.LearnBPE   # module path
+const LBPE = TextSpace.Utils.LearnBPE   # module path
 const BPET = LBPE.BPETokeniser          # handy alias
 
 @testset "LearnBPE - basic training" begin

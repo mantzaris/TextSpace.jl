@@ -1,4 +1,3 @@
-include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "CharProcessing.jl"))
 
 
 @testset "tokenize_char" begin
@@ -72,7 +71,6 @@ end
 
 
 @testset "char_tokens - robust Unicode hammer" begin
-    using Unicode
 
     zwsp   = "\u200B"                       # ZERO-WIDTH SPACE
     flagUS = "🇺🇸"                          # two regional indicators, one grapheme

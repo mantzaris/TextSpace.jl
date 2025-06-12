@@ -1,25 +1,25 @@
-module utils
+module Utils
 
 
-include("TextVectorization.jl")
+include("text_vectorization.jl")
 using .TextVectorization: pad_sequences
 
 
-include("Vocabulary.jl")
+include("vocabulary.jl")
 using .VocabularyCore
 using .VocabularyCore: Vocabulary, convert_tokens_to_ids, convert_ids_to_tokens
 
 
-include("CharTokenizer.jl")
+include("char_tokenizer.jl")
 using .CharTokenizer: chars_to_ids, encode_char_batch
 
 
 # subwords and BPE
-include("LoadBPE.jl")
+include("load_bpe.jl")
 using .LoadBPE: BPETokeniser, load_bpe, bpe_encode_batch
 
 
-include("LearnBPE.jl")
+include("learn_bpe.jl")
 using .LearnBPE: learn_bpe, save_bpe
 
 

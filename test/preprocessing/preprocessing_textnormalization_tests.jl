@@ -1,4 +1,3 @@
-include(joinpath(@__DIR__, "..", "..", "src", "preprocessing", "TextNormalization.jl"))
 
 
 @testset "normalize_unicode" begin
