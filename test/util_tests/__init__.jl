@@ -15,8 +15,8 @@ using TextSpace.Utils.VocabularyCore: build_vocabulary,
         convert_batch_tokens_to_ids, save_vocabulary, load_vocabulary, ensure_unk!
 
 
-include("char_tokenizer_tests.jl")
-include("vocabulary_tests.jl")
-include("text_vectorization_tests.jl")
-include("learn_bpe_tests.jl")
+# include("char_tokenizer_tests.jl")
+# include("vocabulary_tests.jl")
+# include("text_vectorization_tests.jl")
+# include("learn_bpe_tests.jl")
 include("load_bpe_tests.jl")

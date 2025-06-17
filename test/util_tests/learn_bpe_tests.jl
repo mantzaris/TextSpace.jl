@@ -23,7 +23,7 @@ const BPET = LBPE.BPETokeniser          # handy alias
     @test all(haskey(tok.vocab, t) for t in special)
     @test all(haskey(tok.vocab, c) for c in ["h","u","g","</w>"])
 
-    @test length(tok.vocab) ≤ 50
+    @test length(tok.vocab) <= 50
 end
 
 
@@ -33,7 +33,7 @@ end
         human language.  Modern NLP pipelines rely on tokenisation,
         sub-word encoding (such as Byte-Pair Encoding, BPE) and statistical
         language models.  As datasets grow, learned BPE vocabularies can
-        capture domain-specific terms—tokenising ‘language-model’,
+        capture domain-specific terms—tokenising 'language-model',
         ‘tokenisation’ and "pipeline" more effectively than naive
         whitespace splitting.
         """

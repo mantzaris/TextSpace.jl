@@ -1,7 +1,6 @@
 module LoadBPE
 
 import ...resource      # helper for bundled paths
-import ..LearnBPE
 
 using JSON3
 using Base: basename
@@ -15,7 +14,7 @@ struct BPETokeniser
 end
 
 const _ARTEFACTS = Dict(
-    "gpt2_merges.txt"               => (; merges="gpt2_merges.txt",          vocab=nothing),
+    "gpt2_merges.txt"               => (; merges="gpt2_merges.txt",          vocab="gpt_vocab.json"),
     "mGPT_61Lang1pnt9M_merges.txt"  => (; merges="mGPT_61Lang1pnt9M_merges.txt",
                                          vocab ="mGPT_61Lang1pnt9M_vocab.json"),
     "RoBERTa-base_merges.txt"       => (; merges="RoBERTa-base_merges.txt",

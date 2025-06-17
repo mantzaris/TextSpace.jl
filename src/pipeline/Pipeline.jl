@@ -82,14 +82,14 @@ function _get_bpe(spec)
 end
 
 
-function preprocess(text::AbstractString;             # unchanged kwargs …
+function preprocess(text::AbstractString; 
                     granularity::Symbol = :word,
                     word_vocab = nothing,
                     subword_tokenizer = nothing,
                     char_eos = "</w>",
                     split_sentences::Bool = true,
                     char_vocab = nothing,             # NEW: explicit char vocab
-                    output::Symbol = :batch,
+                    output::Symbol = :batch, #???
                     clean::Bool     = true,
                     do_remove_zero_width::Bool = false,
                     clean_kw...)
